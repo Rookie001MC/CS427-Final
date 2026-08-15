@@ -1,0 +1,49 @@
+=== LEVEL 2 REACHABILITY ===
+walk=6 sprint=9 jumpHeight=1.5 gravity=-9 launch=5.196
+footing allowance=0.4 m
+
+jump                                          rise   gap   reach  slack  speed  verdict
+Bay_Dock               -> Bay_Crate_01          0.30  2.00   6.56   4.16  walk   OK
+Bay_Crate_01           -> Bay_Crate_02          0.30  2.20   6.56   3.96  walk   OK
+Bay_Crate_02           -> Bay_Cont_A            0.50  2.40   6.29   3.49  walk   OK
+Bay_Cont_A             -> Bay_Cont_B            0.50  2.60   6.29   3.29  walk   OK
+Bay_Cont_B             -> Bay_Gantry            0.50  2.60   6.29   3.29  walk   OK
+Bay_Gantry             -> Conv_01               0.50  1.20   6.29   4.69  walk   OK
+Conv_01                -> Conv_02               0.50  2.81   6.29   3.09  walk   OK
+Conv_02                -> Conv_03               0.50  2.81   6.29   3.09  walk   OK
+Conv_03                -> Conv_04               0.50  2.81   6.29   3.09  walk   OK
+Conv_04                -> Hall_Deck             0.50  1.00   6.29   4.89  walk   OK
+Hall_Deck              -> Boil_P1               0.85  1.60   5.74   3.74  walk   OK
+Boil_P1                -> Boil_P2               0.85  2.48   5.74   2.86  walk   OK
+Boil_P2                -> Boil_P3               0.85  2.48   5.74   2.86  walk   OK
+Boil_P3                -> Boil_P4               0.85  2.48   5.74   2.86  walk   OK
+Boil_P4                -> Boil_PipeRun          0.85  1.90   5.74   3.44  walk   OK
+Boil_PipeRun           -> Boil_P5               0.85  2.25   5.74   3.10  walk   OK
+Boil_P5                -> Boil_P6               0.85  2.48   5.74   2.86  walk   OK
+Boil_P6                -> Boil_Deck             0.85  1.40   5.74   3.94  walk   OK
+Boil_Deck              -> Scaf_B1               0.70  3.20   5.99   2.39  walk   OK
+Scaf_B1                -> Scaf_Beam_A           0.70  3.30   5.99   2.29  walk   OK
+Scaf_Beam_A            -> Scaf_B2               0.70  3.30   5.99   2.29  walk   OK
+Scaf_B2                -> Scaf_Hang_1           0.70  3.40   5.99   2.19  walk   OK
+Scaf_Hang_1            -> Scaf_Beam_B           0.70  3.40   5.99   2.19  walk   OK
+Scaf_Beam_B            -> Scaf_B3               0.70  3.50   5.99   2.09  walk   OK
+Scaf_B3                -> Scaf_Deck             0.70  2.00   5.99   3.59  walk   OK
+Scaf_Deck              -> Crane_Arm_A           0.60  4.00   9.22   4.82  sprint OK
+Crane_Arm_A            -> Crane_Hook_1          0.60  6.80   9.22   2.02  sprint OK
+Crane_Hook_1           -> Crane_Arm_B           0.60  6.80   9.22   2.02  sprint OK
+Crane_Arm_B            -> Crane_Hook_2          0.60  6.90   9.22   1.92  sprint OK
+Crane_Hook_2           -> Crane_Arm_C           0.60  4.57   9.22   4.25  sprint OK
+Crane_Arm_C            -> Crane_Deck            0.60  4.95   9.22   3.87  sprint OK
+Crane_Deck             -> Rx_Cat01              1.00  1.70   5.46   3.36  walk   OK
+Rx_Cat01               -> Rx_Cat02              1.00  2.64   5.46   2.42  walk   OK
+Rx_Cat02               -> Rx_Cat03              1.00  2.50   5.46   2.56  walk   OK
+Rx_Cat03               -> Rx_Cat04              1.00  2.94   5.46   2.12  walk   OK
+Rx_Cat04               -> Rx_Cat05              1.00  2.50   5.46   2.56  walk   OK
+Rx_Cat05               -> Rx_Cat06              1.00  2.64   5.46   2.42  walk   OK
+Rx_Cat06               -> Rx_Cat07              1.00  2.64   5.46   2.42  walk   OK
+Rx_Cat07               -> Rx_Cat08              1.00  2.50   5.46   2.56  walk   OK
+Rx_Cat08               -> Rx_Cat09              1.00  2.94   5.46   2.12  walk   OK
+Rx_Cat09               -> Rx_Cat10              1.00  2.50   5.46   2.56  walk   OK
+Rx_Cat10               -> Rx_Shelf              1.00  1.89   5.46   3.17  walk   OK
+Rx_Shelf               -> Reactor_Cap           1.00  2.55   5.46   2.51  walk   OK
+--- 43 jumps checked: 0 fail, 0 tight ---

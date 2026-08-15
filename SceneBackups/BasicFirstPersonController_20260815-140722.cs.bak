@@ -35,15 +35,6 @@ public sealed class BasicFirstPersonController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Moves the respawn target used when the player falls below <see cref="fallResetHeight"/>.
-    /// Called by <see cref="CheckpointVolume"/>; does not affect movement in any way.
-    /// </summary>
-    public void SetSpawn(Vector3 position)
-    {
-        spawnPosition = position;
-    }
-
     private void OnEnable()
     {
         LockCursor();
@@ -105,13 +96,6 @@ public sealed class BasicFirstPersonController : MonoBehaviour
 
     private void HandleMovement(Keyboard keyboard)
     {
-        // CharacterController.isGrounded only reflects the most recent Move() call, and a Move
-        // with no downward component performs no ground sweep. Sample it here, before this
-        // frame's moves, so it still describes the previous frame's downward Move. Reading it
-        // after the horizontal Move below reports false whenever the player is standing still
-        // (planar == Vector3.zero), which would gate the jump off.
-        bool grounded = controller.isGrounded;
-
         float horizontal = 0f;
         float vertical = 0f;
 
@@ -139,14 +123,14 @@ public sealed class BasicFirstPersonController : MonoBehaviour
             jumpBufferTimer = Mathf.Max(0f, jumpBufferTimer - Time.deltaTime);
         }
 
-        if (grounded && verticalSpeed < 0f)
+        if (controller.isGrounded && verticalSpeed < 0f)
         {
             verticalSpeed = -2f;
             jumpConsumed = false;
         }
 
         bool jumpRequested = keyboard.spaceKey.isPressed || jumpBufferTimer > 0f;
-        if (grounded && !jumpConsumed && jumpRequested)
+        if (controller.isGrounded && !jumpConsumed && jumpRequested)
         {
             verticalSpeed = Mathf.Sqrt(jumpHeight * -2f * gravity);
             jumpBufferTimer = 0f;
