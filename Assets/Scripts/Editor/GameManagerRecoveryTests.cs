@@ -33,7 +33,7 @@ public sealed class GameManagerRecoveryTests
     [UnityTest]
     public IEnumerator CheckpointRecovery_ContinuesTimerRespawnsLatestCheckpointAndRearmsFallDetection()
     {
-        Fixture fixture = BuildFixture(countdownStepSeconds: 0.01f);
+        Fixture fixture = BuildFixture(countdownStepSeconds: 0.01f, deathRecoverySeconds: 0.5f);
         yield return WaitForState(fixture.Game, RunState.Running);
 
         Assert.That(Activate(fixture.Checkpoints, fixture.Checkpoint), Is.True);
@@ -45,6 +45,12 @@ public sealed class GameManagerRecoveryTests
 
         Assert.That(GetPrivate<bool>(fixture.FallDetector, "armed"), Is.False);
         Assert.That(fixture.Game.Die("duplicate"), Is.False);
+
+        float timerDuringRecovery = fixture.Timer.ElapsedSeconds;
+        yield return new WaitForSecondsRealtime(0.1f);
+
+        Assert.That(fixture.Game.State, Is.EqualTo(RunState.Recovering));
+        Assert.That(fixture.Timer.ElapsedSeconds, Is.GreaterThan(timerDuringRecovery));
 
         yield return WaitForState(fixture.Game, RunState.Running);
 
@@ -85,7 +91,7 @@ public sealed class GameManagerRecoveryTests
         Assert.That(restartedCountdownTicks, Is.EqualTo(new[] { "1" }));
     }
 
-    private Fixture BuildFixture(float countdownStepSeconds)
+    private Fixture BuildFixture(float countdownStepSeconds, float deathRecoverySeconds = 0.05f)
     {
         root = new GameObject("~GameManagerRecoveryTests");
         root.SetActive(false);
@@ -129,7 +135,7 @@ public sealed class GameManagerRecoveryTests
         SetPrivate(game, "fallDetector", fallDetector);
         SetPrivate(game, "countdownFrom", 1);
         SetPrivate(game, "countdownStepSeconds", countdownStepSeconds);
-        SetPrivate(game, "deathRecoverySeconds", 0.05f);
+        SetPrivate(game, "deathRecoverySeconds", deathRecoverySeconds);
 
         root.SetActive(true);
 
