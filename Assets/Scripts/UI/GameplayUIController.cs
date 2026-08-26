@@ -108,7 +108,6 @@ public sealed class GameplayUIController : MonoBehaviour
 
         if (gameOver != null)
         {
-            Bind(gameOver.TryAgainButton, () => game.TryAgain());
             Bind(gameOver.RestartButton, RestartRun);
 
             // QUIT abandons the run rather than the application: the reference's Game Over is a
@@ -155,8 +154,7 @@ public sealed class GameplayUIController : MonoBehaviour
             return;
         }
 
-        // Escape only toggles pause. Death and finish are modal by design: they must be
-        // dismissed through their own buttons, so pause can never mask a Game Over screen.
+        // Escape only toggles pause while a run is actively running or paused.
         if (game.State == RunState.Running)
         {
             game.SetPaused(true);
@@ -227,7 +225,7 @@ public sealed class GameplayUIController : MonoBehaviour
             countdown.Finish();
         }
 
-        if (state != RunState.Dead && gameOver != null)
+        if (state != RunState.Recovering && gameOver != null)
         {
             gameOver.SetVisible(false);
         }
@@ -267,19 +265,6 @@ public sealed class GameplayUIController : MonoBehaviour
             checkpointPopup.HideNow();
         }
 
-        if (gameOver == null)
-        {
-            return;
-        }
-
-        gameOver.Bind(
-            runTimer != null ? runTimer.ElapsedSeconds : 0f,
-            checkpoints != null ? checkpoints.Reached : 0,
-            checkpoints != null ? checkpoints.Total : 0,
-            deaths,
-            game != null ? game.LastDeathReason : string.Empty);
-
-        gameOver.SetVisible(true);
     }
 
     private void HandleRunFinished(float finishTime)

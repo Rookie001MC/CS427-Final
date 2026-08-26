@@ -7,6 +7,6 @@ public enum RunState
     Countdown,
     Running,
     Paused,
-    Dead,
+    Recovering,
     Finished
 }

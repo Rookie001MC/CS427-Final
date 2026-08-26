@@ -21,13 +21,14 @@ public sealed class GameManager : MonoBehaviour
     [SerializeField, Min(0.05f)] private float countdownStepSeconds = 1f;
 
     [Header("Behaviour")]
-    [Tooltip("Pause the clock while the Game Over screen is up, and continue it on TRY AGAIN.")]
-    [SerializeField] private bool pauseTimerOnDeath = true;
+    [SerializeField, Range(0.05f, 0.95f)] private float deathRecoverySeconds = 0.45f;
 
     public RunState State { get; private set; } = RunState.Idle;
     public int Deaths { get; private set; }
+    public GameMode Mode => RunSession.ActiveMode;
+    public RunModeRules Rules => RunModeRules.For(Mode);
 
-    /// <summary>Reason string from the most recent accepted death. Drives the Game Over copy.</summary>
+    /// <summary>Reason string from the most recent accepted death.</summary>
     public string LastDeathReason { get; private set; } = string.Empty;
 
     public RunTimer Timer => runTimer;
@@ -47,6 +48,7 @@ public sealed class GameManager : MonoBehaviour
     public event Action<float> RunFinished;
 
     private Coroutine countdownRoutine;
+    private Coroutine recoveryRoutine;
 
     private void OnEnable()
     {
@@ -68,6 +70,9 @@ public sealed class GameManager : MonoBehaviour
         {
             fallDetector.FellBelowThreshold -= HandleFall;
         }
+
+        CancelRoutine(ref countdownRoutine);
+        CancelRoutine(ref recoveryRoutine);
     }
 
     private void Start()
@@ -83,11 +88,8 @@ public sealed class GameManager : MonoBehaviour
         // Any pause must be lifted before the run restarts, or the countdown never ticks.
         Time.timeScale = 1f;
 
-        if (countdownRoutine != null)
-        {
-            StopCoroutine(countdownRoutine);
-            countdownRoutine = null;
-        }
+        CancelRoutine(ref countdownRoutine);
+        CancelRoutine(ref recoveryRoutine);
 
         Deaths = 0;
 
@@ -151,9 +153,8 @@ public sealed class GameManager : MonoBehaviour
 
     private void HandleFall()
     {
-        // FallDetector disarms itself before raising, so it cannot spam while the Game Over
-        // screen is up. If the death is refused (paused, already dead, finished) the detector
-        // must be re-armed here, or the player stays silently unkillable for the rest of the run.
+        // FallDetector disarms itself before raising. If the death is refused (paused, recovering,
+        // finished), it must be re-armed here or the player stays silently unkillable.
         if (!Die("fell below the death plane") && fallDetector != null)
         {
             fallDetector.Rearm();
@@ -175,52 +176,33 @@ public sealed class GameManager : MonoBehaviour
 
         Deaths++;
         LastDeathReason = reason;
-        SetState(RunState.Dead);
-
-        if (pauseTimerOnDeath && runTimer != null)
-        {
-            runTimer.Pause();
-        }
+        SetState(RunState.Recovering);
 
         if (player != null)
         {
-            player.Freeze(false);
-            player.ReleaseCursor();
+            player.Freeze(true);
         }
 
         Debug.Log($"[Run] death #{Deaths} - {reason}.", this);
         PlayerDied?.Invoke(Deaths);
+        recoveryRoutine = StartCoroutine(RecoverAfterDeath());
         return true;
     }
 
-    /// <summary>Respawn at the latest checkpoint and continue the same run.</summary>
-    public void TryAgain()
+    private IEnumerator RecoverAfterDeath()
     {
-        if (State != RunState.Dead)
+        yield return new WaitForSecondsRealtime(deathRecoverySeconds);
+        recoveryRoutine = null;
+
+        if (Rules.DeathAction == DeathRecoveryAction.RestartRun)
         {
-            return;
+            RestartRun();
+            yield break;
         }
 
-        if (respawn != null)
-        {
-            respawn.RespawnAtCheckpoint();
-        }
-
-        if (fallDetector != null)
-        {
-            fallDetector.Rearm();
-        }
-
-        if (player != null)
-        {
-            player.Unfreeze();
-        }
-
-        if (runTimer != null)
-        {
-            runTimer.Resume();
-        }
-
+        if (respawn != null) respawn.RespawnAtCheckpoint();
+        if (fallDetector != null) fallDetector.Rearm();
+        if (player != null) player.Unfreeze();
         SetState(RunState.Running);
     }
 
@@ -330,8 +312,22 @@ public sealed class GameManager : MonoBehaviour
         StateChanged?.Invoke(next);
     }
 
+    private void CancelRoutine(ref Coroutine routine)
+    {
+        if (routine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(routine);
+        routine = null;
+    }
+
     private void OnDestroy()
     {
+        CancelRoutine(ref countdownRoutine);
+        CancelRoutine(ref recoveryRoutine);
+
         // Never leave a loading scene or a domain reload with a frozen clock.
         Time.timeScale = 1f;
     }
