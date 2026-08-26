@@ -27,9 +27,19 @@ public sealed class LevelCardView : MonoBehaviour
     {
         if (button != null)
         {
-            button.onClick.AddListener(() => Clicked?.Invoke(Entry));
+            button.onClick.AddListener(HandleClick);
         }
     }
+
+    private void OnDestroy()
+    {
+        if (button != null)
+        {
+            button.onClick.RemoveListener(HandleClick);
+        }
+    }
+
+    private void HandleClick() => Clicked?.Invoke(Entry);
 
     public void Bind(LevelEntry entry)
     {
@@ -64,26 +74,31 @@ public sealed class LevelCardView : MonoBehaviour
             preview.enabled = entry.Preview != null;
         }
 
-        bool hasBest = RunStatsTracker.TryGetBest(entry.RecordKey, GameMode.Checkpoint, out float best);
+        int completed = RunStatsTracker.CountCompletedModes(entry.RecordKey);
+        Color completionColor = completed == 2
+            ? UITheme.Green
+            : (completed == 1 ? UITheme.Cyan : UITheme.Label);
 
         if (bestValue != null)
         {
-            bestValue.text = hasBest ? RunTimer.Format(best) : "--:--.--";
-            bestValue.color = hasBest ? UITheme.Cyan : UITheme.Dim;
+            bestValue.text = $"{completed} / 2";
+            bestValue.color = completionColor;
         }
 
         if (statusValue != null)
         {
-            statusValue.text = hasBest ? "CLEARED" : "AVAILABLE";
-            statusValue.color = hasBest ? UITheme.Green : UITheme.Label;
+            statusValue.text = completed == 2
+                ? "CLEARED"
+                : (completed == 1 ? "IN PROGRESS" : "AVAILABLE");
+            statusValue.color = completionColor;
         }
 
-        // Stars stay unlit until a run has actually been finished this session.
+        // Difficulty markers stay unlit until at least one mode has a completed run.
         for (int i = 0; i < stars.Count; i++)
         {
             if (stars[i] != null)
             {
-                stars[i].color = hasBest
+                stars[i].color = completed > 0
                     ? UITheme.Cyan
                     : new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.15f);
             }

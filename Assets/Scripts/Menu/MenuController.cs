@@ -18,6 +18,7 @@ public sealed class MenuController : MonoBehaviour
     [Header("Wiring")]
     [SerializeField] private MenuVisualController visuals;
     [SerializeField] private SceneLoader loader;
+    [SerializeField] private ModeSelectionView modeSelection;
 
     [Header("Main screen")]
     [SerializeField] private Button playButton;
@@ -37,8 +38,11 @@ public sealed class MenuController : MonoBehaviour
     /// </summary>
     public static bool OpenLevelSelectOnStart;
 
+    private LevelEntry pendingLevel;
+
     private void Awake()
     {
+        RunSession.Clear();
         Time.timeScale = 1f;
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -47,9 +51,18 @@ public sealed class MenuController : MonoBehaviour
     private void Start()
     {
         Bind(playButton, PlayDefault);
-        Bind(levelsButton, () => visuals.Show(MenuVisualController.Screen.LevelSelect));
-        Bind(backButton, () => visuals.Show(MenuVisualController.Screen.Main));
+        Bind(levelsButton, ShowLevelSelect);
+        Bind(backButton, ShowMain);
         Bind(quitButton, Quit);
+
+        if (modeSelection != null)
+        {
+            modeSelection.ModeSelected -= ConfirmMode;
+            modeSelection.ModeSelected += ConfirmMode;
+            modeSelection.Cancelled -= CancelModeSelection;
+            modeSelection.Cancelled += CancelModeSelection;
+            modeSelection.Hide();
+        }
 
         // Player Stats is Phase 5. Shown, but visibly inert rather than wired to nothing.
         if (statsButton != null)
@@ -64,8 +77,8 @@ public sealed class MenuController : MonoBehaviour
                 continue;
             }
 
-            cards[i].Clicked -= LaunchLevel;
-            cards[i].Clicked += LaunchLevel;
+            cards[i].Clicked -= OpenModeSelection;
+            cards[i].Clicked += OpenModeSelection;
             cards[i].Bind(i < levels.Count ? levels[i] : null);
         }
 
@@ -80,9 +93,12 @@ public sealed class MenuController : MonoBehaviour
         bool startOnLevelSelect = OpenLevelSelectOnStart;
         OpenLevelSelectOnStart = false;
 
-        visuals.Show(startOnLevelSelect
-            ? MenuVisualController.Screen.LevelSelect
-            : MenuVisualController.Screen.Main);
+        if (visuals != null)
+        {
+            visuals.Show(startOnLevelSelect
+                ? MenuVisualController.Screen.LevelSelect
+                : MenuVisualController.Screen.Main);
+        }
     }
 
     private void OnDestroy()
@@ -92,11 +108,17 @@ public sealed class MenuController : MonoBehaviour
             visuals.ScreenChanged -= HandleScreenChanged;
         }
 
+        if (modeSelection != null)
+        {
+            modeSelection.ModeSelected -= ConfirmMode;
+            modeSelection.Cancelled -= CancelModeSelection;
+        }
+
         for (int i = 0; i < cards.Count; i++)
         {
             if (cards[i] != null)
             {
-                cards[i].Clicked -= LaunchLevel;
+                cards[i].Clicked -= OpenModeSelection;
             }
         }
     }
@@ -130,12 +152,29 @@ public sealed class MenuController : MonoBehaviour
             return;
         }
 
-        LaunchLevel(levels[0]);
+        OpenModeSelection(levels[0]);
     }
 
-    private void LaunchLevel(LevelEntry entry)
+    private void OpenModeSelection(LevelEntry entry)
     {
         if (entry == null || SceneLoader.IsLoading)
+        {
+            return;
+        }
+
+        if (modeSelection == null)
+        {
+            Debug.LogError("[Menu] No mode selection view assigned.", this);
+            return;
+        }
+
+        pendingLevel = entry;
+        modeSelection.Show(entry);
+    }
+
+    private void ConfirmMode(GameMode mode)
+    {
+        if (pendingLevel == null || SceneLoader.IsLoading)
         {
             return;
         }
@@ -146,7 +185,37 @@ public sealed class MenuController : MonoBehaviour
             return;
         }
 
-        loader.Load(entry);
+        LevelEntry level = pendingLevel;
+        pendingLevel = null;
+        modeSelection?.Hide();
+        loader.Load(level, mode);
+    }
+
+    private void CancelModeSelection()
+    {
+        if (SceneLoader.IsLoading)
+        {
+            return;
+        }
+
+        modeSelection?.Hide();
+        pendingLevel = null;
+    }
+
+    private void ShowLevelSelect()
+    {
+        if (!SceneLoader.IsLoading && visuals != null)
+        {
+            visuals.Show(MenuVisualController.Screen.LevelSelect);
+        }
+    }
+
+    private void ShowMain()
+    {
+        if (!SceneLoader.IsLoading && visuals != null)
+        {
+            visuals.Show(MenuVisualController.Screen.Main);
+        }
     }
 
     private static void Quit()
@@ -166,8 +235,7 @@ public sealed class MenuController : MonoBehaviour
         int cleared = 0;
         for (int i = 0; i < levels.Count; i++)
         {
-            if (levels[i] != null && RunStatsTracker.TryGetBest(
-                levels[i].RecordKey, GameMode.Checkpoint, out _))
+            if (levels[i] != null && RunStatsTracker.CountCompletedModes(levels[i].RecordKey) == 2)
             {
                 cleared++;
             }
@@ -206,6 +274,12 @@ public sealed class MenuController : MonoBehaviour
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null || SceneLoader.IsLoading || !keyboard.escapeKey.wasPressedThisFrame)
         {
+            return;
+        }
+
+        if (modeSelection != null && modeSelection.IsVisible)
+        {
+            CancelModeSelection();
             return;
         }
 

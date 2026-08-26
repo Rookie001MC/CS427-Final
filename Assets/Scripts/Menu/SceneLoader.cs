@@ -17,6 +17,7 @@ public sealed class SceneLoader : MonoBehaviour
     [SerializeField] private CanvasGroup group;
     [SerializeField] private TMP_Text levelName;
     [SerializeField] private TMP_Text levelSubtitle;
+    [SerializeField] private TMP_Text modeLabel;
     [SerializeField] private TMP_Text bestValue;
     [SerializeField] private TMP_Text statusLabel;
     [SerializeField] private TMP_Text percentLabel;
@@ -42,30 +43,56 @@ public sealed class SceneLoader : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    /// <summary>Begins loading the scene named by <paramref name="level"/>.</summary>
-    public void Load(LevelEntry level)
+    /// <summary>Begins loading the scene named by <paramref name="level"/> in the selected mode.</summary>
+    public void Load(LevelEntry level, GameMode mode)
     {
-        if (level == null || string.IsNullOrEmpty(level.SceneName))
-        {
-            Debug.LogError("[Loader] Level entry has no scene name.", this);
-            return;
-        }
-
+        // A second click while loading must not replace the run identity already in flight.
         if (active != null)
         {
             return;
         }
+
+        if (level == null || string.IsNullOrWhiteSpace(level.SceneName) ||
+            string.IsNullOrWhiteSpace(level.RecordKey))
+        {
+            RunSession.Clear();
+            Debug.LogError("[Loader] Level entry requires a scene name and record key.", this);
+            return;
+        }
+
+        if (!Application.CanStreamedLevelBeLoaded(level.SceneName))
+        {
+            RunSession.Clear();
+            Debug.LogError($"[Loader] Scene '{level.SceneName}' is not available in the build.", this);
+            return;
+        }
+
+        RunModeRules rules;
+        try
+        {
+            rules = RunModeRules.For(mode);
+        }
+        catch (System.ArgumentOutOfRangeException exception)
+        {
+            RunSession.Clear();
+            Debug.LogError($"[Loader] {exception.Message}", this);
+            return;
+        }
+
+        // Selection is established only after every input has passed validation, but before the
+        // overlay is detached and persisted into the gameplay scene.
+        RunSession.Select(mode, level.RecordKey);
+        Bind(level, mode, rules);
 
         active = this;
         gameObject.SetActive(true);
         transform.SetParent(null, true);
         DontDestroyOnLoad(gameObject);
 
-        Bind(level);
         StartCoroutine(Run(level.SceneName));
     }
 
-    private void Bind(LevelEntry level)
+    private void Bind(LevelEntry level, GameMode mode, RunModeRules rules)
     {
         if (levelName != null)
         {
@@ -75,6 +102,11 @@ public sealed class SceneLoader : MonoBehaviour
         if (levelSubtitle != null)
         {
             levelSubtitle.text = level.Subtitle;
+        }
+
+        if (modeLabel != null)
+        {
+            modeLabel.text = rules.DisplayName;
         }
 
         if (tipLabel != null)
@@ -90,7 +122,7 @@ public sealed class SceneLoader : MonoBehaviour
 
         if (bestValue != null)
         {
-            bool has = RunStatsTracker.TryGetBest(level.RecordKey, GameMode.Checkpoint, out float best);
+            bool has = RunStatsTracker.TryGetBest(level.RecordKey, mode, out float best);
             bestValue.text = has ? RunTimer.Format(best) : "--:--.--";
             bestValue.color = has ? UITheme.Cyan : UITheme.Dim;
         }
