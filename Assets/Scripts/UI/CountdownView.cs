@@ -16,14 +16,13 @@ public sealed class CountdownView : MonoBehaviour
     [SerializeField] private TMP_Text numeral;
     [SerializeField] private List<Image> pips = new List<Image>();
 
-    [SerializeField] private string readyLabel = "GET READY";
     [SerializeField] private string goLabel = "GO!";
 
     private Coroutine punch;
     private int ticksSeen;
 
     /// <summary>Resets pip state for a fresh countdown.</summary>
-    public void Begin()
+    public void Begin(GameMode mode)
     {
         ticksSeen = 0;
 
@@ -37,7 +36,7 @@ public sealed class CountdownView : MonoBehaviour
 
         if (eyebrow != null)
         {
-            eyebrow.text = readyLabel;
+            eyebrow.text = RunModeRules.For(mode).DisplayName + "  //  GET READY";
             eyebrow.color = UITheme.Cyan;
         }
 

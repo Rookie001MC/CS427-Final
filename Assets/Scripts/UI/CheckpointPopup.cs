@@ -9,6 +9,8 @@ using UnityEngine;
 public sealed class CheckpointPopup : MonoBehaviour
 {
     [SerializeField] private UIPanel panel;
+    [SerializeField] private TMP_Text bannerText;
+    [SerializeField] private TMP_Text title;
     [SerializeField] private TMP_Text counter;
     [SerializeField] private TMP_Text splitValue;
     [SerializeField] private TMP_Text deltaValue;
@@ -26,8 +28,21 @@ public sealed class CheckpointPopup : MonoBehaviour
     /// previous split exists for this checkpoint, in which case the comparison column is hidden
     /// rather than invented.
     /// </summary>
-    public void Show(int index, int total, float split, float cumulative, float bestSplit)
+    public void Show(int index, int total, float split, float cumulative, float bestSplit, GameMode mode)
     {
+        RunModeRules rules = RunModeRules.For(mode);
+        bool savesProgress = mode == GameMode.Checkpoint;
+
+        if (bannerText != null)
+        {
+            bannerText.text = savesProgress ? "CHECKPOINT REACHED" : "SECTION CLEARED";
+        }
+
+        if (title != null)
+        {
+            title.text = rules.ProgressName;
+        }
+
         if (counter != null)
         {
             counter.text = $"{index} / {total}";
@@ -65,7 +80,9 @@ public sealed class CheckpointPopup : MonoBehaviour
 
         if (footer != null)
         {
-            footer.text = $"CHECKPOINT {index} SECURED";
+            footer.text = savesProgress
+                ? $"CHECKPOINT {index} / {total} SECURED"
+                : $"SPLIT {index} / {total} RECORDED";
         }
 
         if (panel != null)

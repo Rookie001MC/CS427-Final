@@ -19,7 +19,7 @@ public sealed class GameplayUIController : MonoBehaviour
     [SerializeField] private CountdownView countdown;
     [SerializeField] private CheckpointPopup checkpointPopup;
     [SerializeField] private PauseMenuView pauseMenu;
-    [SerializeField] private GameOverView gameOver;
+    [SerializeField] private DeathRecoveryView deathRecovery;
     [SerializeField] private LevelCompleteView levelComplete;
 
     private void OnEnable()
@@ -71,6 +71,11 @@ public sealed class GameplayUIController : MonoBehaviour
         RefreshCheckpointReadout();
         HandleTimerTicked(0f);
 
+        if (hud != null && game != null)
+        {
+            hud.SetMode(game.Mode);
+        }
+
         if (pauseMenu != null)
         {
             pauseMenu.SetLevelCaption(BuildLevelCaption());
@@ -104,15 +109,6 @@ public sealed class GameplayUIController : MonoBehaviour
             Bind(pauseMenu.RestartButton, RestartRun);
             Bind(pauseMenu.LevelSelectButton, MenuNavigation.GoToLevelSelect);
             Bind(pauseMenu.MainMenuButton, MenuNavigation.GoToMainMenu);
-        }
-
-        if (gameOver != null)
-        {
-            Bind(gameOver.RestartButton, RestartRun);
-
-            // QUIT abandons the run rather than the application: the reference's Game Over is a
-            // mid-run screen, and quitting to desktop from it would be a trap.
-            Bind(gameOver.QuitButton, MenuNavigation.GoToMainMenu);
         }
 
         if (levelComplete != null)
@@ -149,7 +145,18 @@ public sealed class GameplayUIController : MonoBehaviour
     private void Update()
     {
         Keyboard keyboard = Keyboard.current;
-        if (keyboard == null || game == null || !keyboard.escapeKey.wasPressedThisFrame)
+        if (keyboard == null || game == null)
+        {
+            return;
+        }
+
+        if (keyboard.rKey.wasPressedThisFrame && game.State != RunState.Finished)
+        {
+            RestartRun();
+            return;
+        }
+
+        if (!keyboard.escapeKey.wasPressedThisFrame)
         {
             return;
         }
@@ -171,7 +178,9 @@ public sealed class GameplayUIController : MonoBehaviour
     {
         if (hud != null)
         {
-            hud.SetVisible(state == RunState.Running || state == RunState.Countdown);
+            hud.SetVisible(state == RunState.Running ||
+                           state == RunState.Countdown ||
+                           state == RunState.Recovering);
         }
 
         if (pauseMenu != null)
@@ -184,7 +193,8 @@ public sealed class GameplayUIController : MonoBehaviour
                     checkpoints != null ? checkpoints.Reached : 0,
                     checkpoints != null ? checkpoints.Total : 0,
                     stats != null && stats.HasBest,
-                    stats != null ? stats.BestTime : -1f);
+                    stats != null ? stats.BestTime : -1f,
+                    game.Mode);
             }
 
             pauseMenu.SetVisible(show);
@@ -199,12 +209,7 @@ public sealed class GameplayUIController : MonoBehaviour
 
             if (countdown != null)
             {
-                countdown.Begin();
-            }
-
-            if (gameOver != null)
-            {
-                gameOver.SetVisible(false);
+                countdown.Begin(game.Mode);
             }
 
             if (levelComplete != null)
@@ -225,9 +230,9 @@ public sealed class GameplayUIController : MonoBehaviour
             countdown.Finish();
         }
 
-        if (state != RunState.Recovering && gameOver != null)
+        if (state != RunState.Recovering && deathRecovery != null)
         {
-            gameOver.SetVisible(false);
+            deathRecovery.Hide();
         }
     }
 
@@ -254,7 +259,7 @@ public sealed class GameplayUIController : MonoBehaviour
         if (checkpointPopup != null)
         {
             float best = stats != null ? stats.GetBestSplit(index) : -1f;
-            checkpointPopup.Show(index, total, split, cumulative, best);
+            checkpointPopup.Show(index, total, split, cumulative, best, game.Mode);
         }
     }
 
@@ -265,6 +270,14 @@ public sealed class GameplayUIController : MonoBehaviour
             checkpointPopup.HideNow();
         }
 
+        if (deathRecovery != null)
+        {
+            deathRecovery.Show(
+                game.Mode,
+                game.LastDeathReason,
+                checkpoints != null ? checkpoints.Reached : 0,
+                checkpoints != null ? checkpoints.Total : 0);
+        }
     }
 
     private void HandleRunFinished(float finishTime)
@@ -291,7 +304,8 @@ public sealed class GameplayUIController : MonoBehaviour
             game != null ? game.Deaths : 0,
             stats != null ? stats.MaxSpeed : 0f,
             levelInfo != null ? levelInfo.DisplayName : gameObject.scene.name.ToUpperInvariant(),
-            levelInfo != null ? levelInfo.Subtitle : string.Empty);
+            levelInfo != null ? levelInfo.Subtitle : string.Empty,
+            game.Mode);
 
         levelComplete.SetVisible(true);
     }

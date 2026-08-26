@@ -58,10 +58,10 @@ public static class GameplayUIBuilder
         CountdownView countdown = BuildCountdown(root);
         CheckpointPopup popup = BuildCheckpointPopup(root);
         PauseMenuView pause = BuildPause(root);
-        GameOverView gameOver = BuildGameOver(root);
+        DeathRecoveryView deathRecovery = BuildDeathRecovery(root);
         LevelCompleteView complete = BuildLevelComplete(root);
 
-        WireController(rootGo, hud, countdown, popup, pause, gameOver, complete);
+        WireController(rootGo, hud, countdown, popup, pause, deathRecovery, complete);
 
         Selection.activeGameObject = rootGo;
         EditorUtility.SetDirty(rootGo);
@@ -103,6 +103,9 @@ public static class GameplayUIBuilder
     {
         RectTransform layer = Layer(root, "HUD", false, out UIPanel panel);
 
+        TMP_Text mode = Centered(layer, "Mode", "CHECKPOINT MODE", 19f, UITheme.Cyan,
+            500f, 900f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
+
         // top-left: checkpoint progress
         RectTransform left = Block(layer, "CheckpointBlock", new Vector2(0f, 1f), new Vector2(48f, -44f), new Vector2(320f, 96f));
         HudPlate(left, new Vector2(0f, 1f), new Vector2(-18f, 12f), new Vector2(260f, 116f));
@@ -123,6 +126,8 @@ public static class GameplayUIBuilder
 
         GameplayHUD hud = layer.gameObject.AddComponent<GameplayHUD>();
         SetRef(hud, "panel", panel);
+        SetRef(hud, "modeValue", mode);
+        SetRef(hud, "checkpointLabel", cpLabel);
         SetRef(hud, "checkpointValue", cpValue);
         SetRef(hud, "timerValue", tValue);
         SetRef(hud, "speedValue", speed);
@@ -136,7 +141,8 @@ public static class GameplayUIBuilder
         RectTransform layer = Layer(root, "Countdown", false, out UIPanel panel);
         Scrim(layer, UITheme.ScrimLight);
 
-        TMP_Text eyebrow = Centered(layer, "Eyebrow", "GET READY", UITheme.Eyebrow, UITheme.Cyan, 190f, 800f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
+        TMP_Text eyebrow = Centered(layer, "Eyebrow", "CHECKPOINT MODE  //  GET READY", UITheme.Eyebrow,
+            UITheme.Cyan, 190f, 1200f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         TMP_Text numeral = Centered(layer, "Numeral", "3", UITheme.TitleHuge * 1.9f, UITheme.White, 10f, 900f, 0f, FontStyles.Bold, UIFontRole.Display);
         ((RectTransform)numeral.transform).sizeDelta = new Vector2(900f, 360f);
 
@@ -190,7 +196,7 @@ public static class GameplayUIBuilder
         TMP_Text bannerText = Text(banner, "Text", "CHECKPOINT REACHED", 21f, UITheme.Cyan, TextAlignmentOptions.Center, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)bannerText.transform, new Vector2(0.5f, 0.5f), new Vector2(16f, 0f), new Vector2(400f, 30f));
 
-        Centered(layer, "Title", "CHECKPOINT", 116f, UITheme.White, 88f, 1400f, 2f, FontStyles.Bold, UIFontRole.Display);
+        TMP_Text title = Centered(layer, "Title", "CHECKPOINT", 116f, UITheme.White, 88f, 1400f, 2f, FontStyles.Bold, UIFontRole.Display);
         TMP_Text counter = Centered(layer, "Counter", "0 / 0", 76f, UITheme.Cyan, -8f, 900f, 6f, FontStyles.Bold, UIFontRole.Display);
 
         RectTransform stats = Block(layer, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0f, -135f), new Vector2(960f, 110f));
@@ -204,6 +210,8 @@ public static class GameplayUIBuilder
 
         CheckpointPopup view = layer.gameObject.AddComponent<CheckpointPopup>();
         SetRef(view, "panel", panel);
+        SetRef(view, "bannerText", bannerText);
+        SetRef(view, "title", title);
         SetRef(view, "counter", counter);
         SetRef(view, "splitValue", splitValue);
         SetRef(view, "deltaValue", deltaValue);
@@ -221,6 +229,8 @@ public static class GameplayUIBuilder
         RectTransform layer = Layer(root, "Pause", true, out UIPanel panel);
         Scrim(layer, UITheme.Scrim);
 
+        TMP_Text mode = Centered(layer, "Mode", "CHECKPOINT MODE", 19f, UITheme.Cyan,
+            385f, 900f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         Centered(layer, "Eyebrow", "GAME PAUSED", UITheme.Eyebrow, UITheme.Label, 335f, 900f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         Centered(layer, "Title", "PAUSE", UITheme.TitleLarge * 1.35f, UITheme.White, 235f, 1200f, 2f, FontStyles.Bold, UIFontRole.Display);
         Divider(layer, "Divider", new Vector2(0f, 150f), new Vector2(560f, 1f));
@@ -247,6 +257,7 @@ public static class GameplayUIBuilder
         PauseMenuView view = layer.gameObject.AddComponent<PauseMenuView>();
         SetRef(view, "footer", footer);
         SetRef(view, "panel", panel);
+        SetRef(view, "modeValue", mode);
         SetRef(view, "elapsedValue", elapsed);
         SetRef(view, "checkpointValue", cp);
         SetRef(view, "bestValue", best);
@@ -257,62 +268,47 @@ public static class GameplayUIBuilder
         return view;
     }
 
-    // ------------------------------------------------------------------ game over
+    // ------------------------------------------------------------------ death recovery
 
-    private static GameOverView BuildGameOver(RectTransform root)
+    private static DeathRecoveryView BuildDeathRecovery(RectTransform root)
     {
-        RectTransform layer = Layer(root, "GameOver", true, out UIPanel panel);
-        Scrim(layer, UITheme.Scrim);
+        RectTransform layer = Layer(root, "DeathRecovery", false, out UIPanel panel);
+        Scrim(layer, UITheme.ScrimLight);
 
-        // Dark fill with an orange hairline, not an orange fill: orange-on-orange is unreadable.
-        RectTransform pill = PanelBox(layer, "Pill", new Vector2(0.5f, 0.5f), new Vector2(0f, 385f), new Vector2(340f, 50f),
-            new Color(0.14f, 0.055f, 0.025f, 0.95f),
-            new Color(UITheme.Orange.r, UITheme.Orange.g, UITheme.Orange.b, 0.60f));
-        TMP_Text pillText = Text(pill, "Text", "RUN TERMINATED", 22f, UITheme.Orange, TextAlignmentOptions.Center, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)pillText.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(310f, 30f));
+        RectTransform pill = PanelBox(layer, "ModePill", new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 250f), new Vector2(440f, 52f),
+            new Color(0.025f, 0.10f, 0.12f, 0.94f),
+            new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.55f));
+        TMP_Text eyebrow = Text(pill, "Text", "CHECKPOINT MODE", 21f, UITheme.Cyan,
+            TextAlignmentOptions.Center, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
+        Anchor((RectTransform)eyebrow.transform, new Vector2(0.5f, 0.5f), Vector2.zero,
+            new Vector2(410f, 30f));
 
-        TMP_Text top = Centered(layer, "HeadlineTop", "FALL", 108f, UITheme.White, 262f, 1400f, 4f, FontStyles.Bold, UIFontRole.Display);
-        TMP_Text bottom = Centered(layer, "HeadlineBottom", "DETECTED", 150f, UITheme.Orange, 135f, 1600f, 4f, FontStyles.Bold, UIFontRole.Display);
-        ((RectTransform)bottom.transform).sizeDelta = new Vector2(1600f, 190f);
+        TMP_Text headline = Centered(layer, "Headline", "RECOVERING", 138f, UITheme.Orange,
+            90f, 1500f, 4f, FontStyles.Bold, UIFontRole.Display);
+        Divider(layer, "Divider", new Vector2(0f, -16f), new Vector2(660f, 1f));
 
-        Divider(layer, "Divider", new Vector2(0f, 42f), new Vector2(620f, 1f));
+        TMP_Text detail = Centered(layer, "Detail", "RETURNING TO CHECKPOINT 0 / 0", 27f,
+            UITheme.White, -92f, 1200f, 4f, fontRole: UIFontRole.Mono);
 
-        RectTransform stats = Block(layer, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0f, -48f), new Vector2(960f, 100f));
-        StatColumn(stats, "Time", "TIME", -290f, UITheme.Orange, out _, out TMP_Text timeValue, 270f, 40f);
-        StatColumn(stats, "Checkpoint", "CHECKPOINT", 0f, UITheme.White, out _, out TMP_Text cpValue, 270f, 40f);
-        StatColumn(stats, "Deaths", "DEATHS", 290f, UITheme.White, out _, out TMP_Text deathsValue, 270f, 40f);
-        Divider(stats, "Sep_1", new Vector2(-145f, -8f), new Vector2(1f, 64f));
-        Divider(stats, "Sep_2", new Vector2(145f, -8f), new Vector2(1f, 64f));
-
-        RectTransform cause = PanelBox(layer, "Cause", new Vector2(0.5f, 0.5f), new Vector2(0f, -195f), new Vector2(660f, 150f),
+        RectTransform reason = PanelBox(layer, "Reason", new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -205f), new Vector2(760f, 110f),
             UITheme.PanelFill, UITheme.PanelBorder);
-        TMP_Text causeLabel = Text(cause, "Label", "FAILURE CAUSE", 19f, UITheme.Orange, TextAlignmentOptions.TopLeft, 8f, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)causeLabel.transform, new Vector2(0f, 1f), new Vector2(26f, -22f), new Vector2(560f, 24f));
-        TMP_Text causeHead = Text(cause, "Headline", "-", 24f, UITheme.White, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
-        Anchor((RectTransform)causeHead.transform, new Vector2(0f, 1f), new Vector2(26f, -56f), new Vector2(568f, 30f));
-        TMP_Text causeTip = Text(cause, "Tip", "-", 19f, UITheme.Dim, TextAlignmentOptions.TopLeft, 1f, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)causeTip.transform, new Vector2(0f, 1f), new Vector2(26f, -92f), new Vector2(568f, 50f));
+        TMP_Text reasonLabel = Text(reason, "Label", "RECOVERY TRIGGER", 18f, UITheme.Orange,
+            TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
+        Anchor((RectTransform)reasonLabel.transform, new Vector2(0f, 1f),
+            new Vector2(28f, -18f), new Vector2(700f, 24f));
+        TMP_Text reasonValue = Text(reason, "Value", string.Empty, 22f, UITheme.Label,
+            TextAlignmentOptions.TopLeft, 1f, fontRole: UIFontRole.Mono);
+        Anchor((RectTransform)reasonValue.transform, new Vector2(0f, 1f),
+            new Vector2(28f, -50f), new Vector2(700f, 36f));
 
-        // Three equal buttons, symmetric about centre.
-        Button tryAgain = Btn(layer, "TryAgain", "TRY AGAIN", new Vector2(-285f, -345f), new Vector2(270f, 76f),
-            MenuButtonVisual.Style.Primary, UITheme.Orange, TextAlignmentOptions.Center);
-        Button restart = Btn(layer, "Restart", "RESTART RUN", new Vector2(0f, -345f), new Vector2(270f, 76f),
-            MenuButtonVisual.Style.Outline, UITheme.Orange, TextAlignmentOptions.Center);
-        Button quit = Btn(layer, "Quit", "QUIT", new Vector2(285f, -345f), new Vector2(270f, 76f),
-            MenuButtonVisual.Style.Ghost, UITheme.Orange, TextAlignmentOptions.Center);
-
-        GameOverView view = layer.gameObject.AddComponent<GameOverView>();
+        DeathRecoveryView view = layer.gameObject.AddComponent<DeathRecoveryView>();
         SetRef(view, "panel", panel);
-        SetRef(view, "headlineTop", top);
-        SetRef(view, "headlineBottom", bottom);
-        SetRef(view, "timeValue", timeValue);
-        SetRef(view, "checkpointValue", cpValue);
-        SetRef(view, "deathsValue", deathsValue);
-        SetRef(view, "causeHeadline", causeHead);
-        SetRef(view, "causeTip", causeTip);
-        SetRef(view, "tryAgainButton", tryAgain);
-        SetRef(view, "restartButton", restart);
-        SetRef(view, "quitButton", quit);
+        SetRef(view, "eyebrow", eyebrow);
+        SetRef(view, "headline", headline);
+        SetRef(view, "detail", detail);
+        SetRef(view, "reasonValue", reasonValue);
         return view;
     }
 
@@ -323,6 +319,8 @@ public static class GameplayUIBuilder
         RectTransform layer = Layer(root, "LevelComplete", true, out UIPanel panel);
         Scrim(layer, UITheme.Scrim);
 
+        TMP_Text mode = Centered(layer, "Mode", "CHECKPOINT MODE", 19f, UITheme.Cyan,
+            455f, 900f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         Centered(layer, "Eyebrow", "STAGE CLEARED", UITheme.Eyebrow, UITheme.Cyan, 405f, 900f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         // Placeholders only - LevelCompleteView.Bind writes the real strings from LevelInfo.
         TMP_Text name = Centered(layer, "StageName", "LEVEL", 104f, UITheme.White, 310f, 1600f, 2f, FontStyles.Bold, UIFontRole.Display);
@@ -369,6 +367,7 @@ public static class GameplayUIBuilder
 
         LevelCompleteView view = layer.gameObject.AddComponent<LevelCompleteView>();
         SetRef(view, "panel", panel);
+        SetRef(view, "modeValue", mode);
         SetRef(view, "stageName", name);
         SetRef(view, "stageSubtitle", sub);
         SetList(view, "stars", stars.ConvertAll(s => (Object)s));
@@ -391,7 +390,8 @@ public static class GameplayUIBuilder
     // ------------------------------------------------------------------ controller wiring
 
     private static void WireController(GameObject rootGo, GameplayHUD hud, CountdownView countdown,
-        CheckpointPopup popup, PauseMenuView pause, GameOverView gameOver, LevelCompleteView complete)
+        CheckpointPopup popup, PauseMenuView pause, DeathRecoveryView deathRecovery,
+        LevelCompleteView complete)
     {
         GameManager game = Object.FindFirstObjectByType<GameManager>();
         RunTimer timer = Object.FindFirstObjectByType<RunTimer>();
@@ -434,7 +434,7 @@ public static class GameplayUIBuilder
         SetRef(controller, "countdown", countdown);
         SetRef(controller, "checkpointPopup", popup);
         SetRef(controller, "pauseMenu", pause);
-        SetRef(controller, "gameOver", gameOver);
+        SetRef(controller, "deathRecovery", deathRecovery);
         SetRef(controller, "levelComplete", complete);
     }
 

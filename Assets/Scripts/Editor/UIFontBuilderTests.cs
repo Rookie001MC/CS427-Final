@@ -29,7 +29,7 @@ public sealed class UIFontBuilderTests
         Assert.That(scene.isLoaded, Is.True);
         AssertSourceFont("GameplayUI/HUD/TimerBlock/Label", "Lekton-Regular");
         AssertSourceFont("GameplayUI/HUD/TimerBlock/Value", "BarlowCondensed-Black");
-        AssertSourceFont("GameplayUI/GameOver/Cause/Tip", "Lekton-Regular");
+        AssertSourceFont("GameplayUI/DeathRecovery/Detail", "Lekton-Regular");
     }
 
     private static void AssertSourceFont(string path, string expectedSourceFont)

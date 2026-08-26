@@ -5,6 +5,24 @@ using UnityEngine;
 public sealed class ModeUIBuilderTests
 {
     [Test]
+    public void GameplayUIBuilder_CreatesModeAwareRecoveryUI()
+    {
+        UnityEditor.SceneManagement.EditorSceneManager.NewScene(
+            UnityEditor.SceneManagement.NewSceneSetup.EmptyScene,
+            UnityEditor.SceneManagement.NewSceneMode.Single);
+        new GameObject("GameManager", typeof(GameManager), typeof(LevelInfo));
+        new GameObject("RunTimer", typeof(RunTimer));
+        new GameObject("CheckpointManager", typeof(CheckpointManager));
+
+        GameplayUIBuilder.Build();
+
+        Assert.That(GameObject.Find("GameplayUI/DeathRecovery"), Is.Not.Null);
+        Assert.That(GameObject.Find("GameplayUI/GameOver"), Is.Null);
+        Assert.That(GameObject.Find("GameplayUI/HUD/Mode"), Is.Not.Null);
+        Assert.That(GameObject.Find("GameplayUI/LevelComplete/Mode"), Is.Not.Null);
+    }
+
+    [Test]
     public void MainMenuBuilder_CreatesAndWiresModeModal()
     {
         MainMenuBuilder.Build();

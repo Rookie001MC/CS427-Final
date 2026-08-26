@@ -8,12 +8,29 @@ using UnityEngine;
 public sealed class GameplayHUD : MonoBehaviour
 {
     [SerializeField] private UIPanel panel;
+    [SerializeField] private TMP_Text modeValue;
+    [SerializeField] private TMP_Text checkpointLabel;
     [SerializeField] private TMP_Text checkpointValue;
     [SerializeField] private TMP_Text timerValue;
     [SerializeField] private TMP_Text speedValue;
     [SerializeField] private RunStatsTracker stats;
 
     public UIPanel Panel => panel;
+
+    public void SetMode(GameMode mode)
+    {
+        RunModeRules rules = RunModeRules.For(mode);
+
+        if (modeValue != null)
+        {
+            modeValue.text = rules.DisplayName;
+        }
+
+        if (checkpointLabel != null)
+        {
+            checkpointLabel.text = rules.ProgressName;
+        }
+    }
 
     public void SetVisible(bool visible)
     {

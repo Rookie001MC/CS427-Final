@@ -9,6 +9,7 @@ using UnityEngine.UI;
 public sealed class PauseMenuView : MonoBehaviour
 {
     [SerializeField] private UIPanel panel;
+    [SerializeField] private TMP_Text modeValue;
     [SerializeField] private TMP_Text elapsedValue;
     [SerializeField] private TMP_Text checkpointValue;
     [SerializeField] private TMP_Text bestValue;
@@ -33,8 +34,13 @@ public sealed class PauseMenuView : MonoBehaviour
         }
     }
 
-    public void Bind(float elapsed, int reached, int total, bool hasBest, float bestTime)
+    public void Bind(float elapsed, int reached, int total, bool hasBest, float bestTime, GameMode mode)
     {
+        if (modeValue != null)
+        {
+            modeValue.text = RunModeRules.For(mode).DisplayName;
+        }
+
         if (elapsedValue != null)
         {
             elapsedValue.text = RunTimer.Format(elapsed);

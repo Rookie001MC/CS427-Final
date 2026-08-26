@@ -12,6 +12,7 @@ public sealed class LevelCompleteView : MonoBehaviour
     [SerializeField] private UIPanel panel;
 
     [Header("Header")]
+    [SerializeField] private TMP_Text modeValue;
     [SerializeField] private TMP_Text stageName;
     [SerializeField] private TMP_Text stageSubtitle;
     [SerializeField] private List<Image> stars = new List<Image>();
@@ -46,8 +47,14 @@ public sealed class LevelCompleteView : MonoBehaviour
     }
 
     public void Bind(float finishTime, bool isNewBest, bool hasBest, float bestTime,
-        int reached, int total, int deaths, float maxSpeed, string levelName, string levelSubtitle)
+        int reached, int total, int deaths, float maxSpeed, string levelName, string levelSubtitle,
+        GameMode mode)
     {
+        if (modeValue != null)
+        {
+            modeValue.text = RunModeRules.For(mode).DisplayName;
+        }
+
         if (stageName != null && !string.IsNullOrEmpty(levelName))
         {
             stageName.text = levelName;
@@ -91,7 +98,9 @@ public sealed class LevelCompleteView : MonoBehaviour
 
         if (personalBestNote != null)
         {
-            personalBestNote.text = "This session";
+            personalBestNote.text = mode == GameMode.Checkpoint
+                ? "LOCAL BEST • CHECKPOINT"
+                : "LOCAL BEST • NO CHECKPOINT";
             personalBestNote.color = UITheme.Dim;
         }
 
