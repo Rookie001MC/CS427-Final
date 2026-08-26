@@ -44,6 +44,18 @@ public sealed class BasicFirstPersonController : MonoBehaviour
         spawnPosition = position;
     }
 
+    /// <summary>
+    /// Clears the accumulated vertical speed and any buffered jump. Called by
+    /// <see cref="PlayerFreezeController"/> straight after a respawn teleport so the player does
+    /// not inherit the fall velocity from before the reset. Changes no movement tuning.
+    /// </summary>
+    public void ResetMotion()
+    {
+        verticalSpeed = 0f;
+        jumpBufferTimer = 0f;
+        jumpConsumed = false;
+    }
+
     private void OnEnable()
     {
         LockCursor();
