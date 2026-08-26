@@ -83,6 +83,45 @@ public sealed class RunRecordStoreTests
     }
 
     [Test]
+    public void Constructor_MissingVersionRejectsSaveWithoutPoisoningNewRecord()
+    {
+        const string json = "{\"records\":[{\"levelKey\":\"industrial\",\"mode\":0," +
+            "\"bestTime\":12.0,\"bestSplits\":[12.0]}]}";
+        var store = new RunRecordStore(new MemoryPersistence { Json = json });
+
+        Assert.That(store.TryGetBest("industrial", GameMode.Checkpoint, out _), Is.False);
+        Assert.That(store.Commit("industrial", GameMode.Checkpoint, 20f, new[] { 20f }), Is.True);
+        Assert.That(store.TryGetBest("industrial", GameMode.Checkpoint, out float best), Is.True);
+        Assert.That(best, Is.EqualTo(20f));
+    }
+
+    [Test]
+    public void Constructor_MissingModeRejectsRecordWithoutPoisoningNewRecord()
+    {
+        const string json = "{\"version\":1,\"records\":[{\"levelKey\":\"industrial\"," +
+            "\"bestTime\":12.0,\"bestSplits\":[12.0]}]}";
+        var store = new RunRecordStore(new MemoryPersistence { Json = json });
+
+        Assert.That(store.TryGetBest("industrial", GameMode.Checkpoint, out _), Is.False);
+        Assert.That(store.Commit("industrial", GameMode.Checkpoint, 20f, new[] { 20f }), Is.True);
+        Assert.That(store.TryGetBest("industrial", GameMode.Checkpoint, out float best), Is.True);
+        Assert.That(best, Is.EqualTo(20f));
+    }
+
+    [Test]
+    public void Constructor_MissingBestTimeRejectsRecordWithoutPoisoningNewRecord()
+    {
+        const string json = "{\"version\":1,\"records\":[{\"levelKey\":\"industrial\",\"mode\":0," +
+            "\"bestSplits\":[12.0]}]}";
+        var store = new RunRecordStore(new MemoryPersistence { Json = json });
+
+        Assert.That(store.TryGetBest("industrial", GameMode.Checkpoint, out _), Is.False);
+        Assert.That(store.Commit("industrial", GameMode.Checkpoint, 20f, new[] { 20f }), Is.True);
+        Assert.That(store.TryGetBest("industrial", GameMode.Checkpoint, out float best), Is.True);
+        Assert.That(best, Is.EqualTo(20f));
+    }
+
+    [Test]
     public void Commit_SaveFailureRetainsTheInMemoryBest()
     {
         var store = new RunRecordStore(new MemoryPersistence { ThrowOnSave = true });

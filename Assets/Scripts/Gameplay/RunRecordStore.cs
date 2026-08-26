@@ -7,7 +7,7 @@ public sealed class RunRecordStore
     [Serializable]
     private sealed class SaveFile
     {
-        public int version = 1;
+        public int version = -1;
         public List<RecordData> records = new List<RecordData>();
     }
 
@@ -15,8 +15,8 @@ public sealed class RunRecordStore
     private sealed class RecordData
     {
         public string levelKey;
-        public int mode;
-        public float bestTime;
+        public int mode = -1;
+        public float bestTime = -1f;
         public List<float> bestSplits = new List<float>();
     }
 
