@@ -18,17 +18,16 @@ public static class GameplayUIBuilder
 {
     private const string RootName = "GameplayUI";
 
-    private static TMP_FontAsset font;
+    private static UIFontSet fonts;
 
     // ------------------------------------------------------------------ entry point
 
     [MenuItem("Tools/Parkour UI/Build Gameplay UI")]
     public static void Build()
     {
-        font = TMP_Settings.defaultFontAsset;
-        if (font == null)
+        if (!UIFontCatalog.TryLoad(out fonts))
         {
-            Debug.LogError("[UI] TMP Essential Resources are not imported. Aborting.");
+            Debug.LogError("[UI] UI font assets could not be loaded. Aborting.");
             return;
         }
 
@@ -107,19 +106,19 @@ public static class GameplayUIBuilder
         // top-left: checkpoint progress
         RectTransform left = Block(layer, "CheckpointBlock", new Vector2(0f, 1f), new Vector2(48f, -44f), new Vector2(320f, 96f));
         HudPlate(left, new Vector2(0f, 1f), new Vector2(-18f, 12f), new Vector2(260f, 116f));
-        TMP_Text cpLabel = Text(left, "Label", "CHECKPOINT", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.TopLeft, UITheme.LabelSpacing);
+        TMP_Text cpLabel = Text(left, "Label", "CHECKPOINT", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)cpLabel.transform, new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(320f, 26f));
-        TMP_Text cpValue = Text(left, "Value", "0 / 0", 52f, UITheme.White, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold);
+        TMP_Text cpValue = Text(left, "Value", "0 / 0", 52f, UITheme.White, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)cpValue.transform, new Vector2(0f, 1f), new Vector2(0f, -30f), new Vector2(320f, 62f));
 
         // top-right: clock + speed
         RectTransform right = Block(layer, "TimerBlock", new Vector2(1f, 1f), new Vector2(-48f, -44f), new Vector2(360f, 130f));
         HudPlate(right, new Vector2(1f, 1f), new Vector2(18f, 12f), new Vector2(330f, 150f));
-        TMP_Text tLabel = Text(right, "Label", "TIME", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.TopRight, UITheme.LabelSpacing);
+        TMP_Text tLabel = Text(right, "Label", "TIME", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.TopRight, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)tLabel.transform, new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(360f, 26f));
-        TMP_Text tValue = Text(right, "Value", "00:00.00", 58f, UITheme.Cyan, TextAlignmentOptions.TopRight, 0f, FontStyles.Bold);
+        TMP_Text tValue = Text(right, "Value", "00:00.00", 58f, UITheme.Cyan, TextAlignmentOptions.TopRight, 0f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)tValue.transform, new Vector2(1f, 1f), new Vector2(0f, -30f), new Vector2(360f, 68f));
-        TMP_Text speed = Text(right, "Speed", "0.0 m/s", 22f, UITheme.Dim, TextAlignmentOptions.TopRight, 4f);
+        TMP_Text speed = Text(right, "Speed", "0.0 m/s", 22f, UITheme.Dim, TextAlignmentOptions.TopRight, 4f, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)speed.transform, new Vector2(1f, 1f), new Vector2(0f, -98f), new Vector2(360f, 28f));
 
         GameplayHUD hud = layer.gameObject.AddComponent<GameplayHUD>();
@@ -137,8 +136,8 @@ public static class GameplayUIBuilder
         RectTransform layer = Layer(root, "Countdown", false, out UIPanel panel);
         Scrim(layer, UITheme.ScrimLight);
 
-        TMP_Text eyebrow = Centered(layer, "Eyebrow", "GET READY", UITheme.Eyebrow, UITheme.Cyan, 190f, 800f, UITheme.EyebrowSpacing);
-        TMP_Text numeral = Centered(layer, "Numeral", "3", UITheme.TitleHuge * 1.9f, UITheme.White, 10f, 900f, 0f, FontStyles.Bold);
+        TMP_Text eyebrow = Centered(layer, "Eyebrow", "GET READY", UITheme.Eyebrow, UITheme.Cyan, 190f, 800f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
+        TMP_Text numeral = Centered(layer, "Numeral", "3", UITheme.TitleHuge * 1.9f, UITheme.White, 10f, 900f, 0f, FontStyles.Bold, UIFontRole.Display);
         ((RectTransform)numeral.transform).sizeDelta = new Vector2(900f, 360f);
 
         RectTransform pipRow = Block(layer, "Pips", new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(200f, 20f));
@@ -157,9 +156,9 @@ public static class GameplayUIBuilder
         for (int i = 0; i < labels.Length; i++)
         {
             float x = (i - 1.5f) * 200f;
-            TMP_Text l = Text(hints, $"Label_{i}", labels[i], 18f, UITheme.Dim, TextAlignmentOptions.Center, 6f);
+            TMP_Text l = Text(hints, $"Label_{i}", labels[i], 18f, UITheme.Dim, TextAlignmentOptions.Center, 6f, fontRole: UIFontRole.Mono);
             Anchor((RectTransform)l.transform, new Vector2(0.5f, 0.5f), new Vector2(x, 16f), new Vector2(190f, 22f));
-            TMP_Text k = Text(hints, $"Key_{i}", keys[i], 22f, UITheme.White, TextAlignmentOptions.Center, 2f, FontStyles.Bold);
+            TMP_Text k = Text(hints, $"Key_{i}", keys[i], 22f, UITheme.White, TextAlignmentOptions.Center, 2f, FontStyles.Bold, UIFontRole.Mono);
             Anchor((RectTransform)k.transform, new Vector2(0.5f, 0.5f), new Vector2(x, -10f), new Vector2(190f, 28f));
         }
 
@@ -188,11 +187,11 @@ public static class GameplayUIBuilder
             new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.55f));
         Image dot = Img(banner, "Dot", UITheme.Cyan);
         Anchor((RectTransform)dot.transform, new Vector2(0f, 0.5f), new Vector2(38f, 0f), new Vector2(10f, 10f));
-        TMP_Text bannerText = Text(banner, "Text", "CHECKPOINT REACHED", 21f, UITheme.Cyan, TextAlignmentOptions.Center, UITheme.EyebrowSpacing);
+        TMP_Text bannerText = Text(banner, "Text", "CHECKPOINT REACHED", 21f, UITheme.Cyan, TextAlignmentOptions.Center, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)bannerText.transform, new Vector2(0.5f, 0.5f), new Vector2(16f, 0f), new Vector2(400f, 30f));
 
-        Centered(layer, "Title", "CHECKPOINT", 116f, UITheme.White, 88f, 1400f, 2f, FontStyles.Bold);
-        TMP_Text counter = Centered(layer, "Counter", "0 / 0", 76f, UITheme.Cyan, -8f, 900f, 6f, FontStyles.Bold);
+        Centered(layer, "Title", "CHECKPOINT", 116f, UITheme.White, 88f, 1400f, 2f, FontStyles.Bold, UIFontRole.Display);
+        TMP_Text counter = Centered(layer, "Counter", "0 / 0", 76f, UITheme.Cyan, -8f, 900f, 6f, FontStyles.Bold, UIFontRole.Display);
 
         RectTransform stats = Block(layer, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0f, -135f), new Vector2(960f, 110f));
         StatColumn(stats, "Split", "SPLIT TIME", -300f, UITheme.Green, out _, out TMP_Text splitValue, 280f, 38f);
@@ -201,7 +200,7 @@ public static class GameplayUIBuilder
         Divider(stats, "Sep_1", new Vector2(-150f, -6f), new Vector2(1f, 66f));
         Divider(stats, "Sep_2", new Vector2(150f, -6f), new Vector2(1f, 66f));
 
-        TMP_Text footer = Centered(layer, "Footer", "CHECKPOINT SECURED", 19f, UITheme.Dim, -218f, 900f, 8f);
+        TMP_Text footer = Centered(layer, "Footer", "CHECKPOINT SECURED", 19f, UITheme.Dim, -218f, 900f, 8f, fontRole: UIFontRole.Mono);
 
         CheckpointPopup view = layer.gameObject.AddComponent<CheckpointPopup>();
         SetRef(view, "panel", panel);
@@ -222,8 +221,8 @@ public static class GameplayUIBuilder
         RectTransform layer = Layer(root, "Pause", true, out UIPanel panel);
         Scrim(layer, UITheme.Scrim);
 
-        Centered(layer, "Eyebrow", "GAME PAUSED", UITheme.Eyebrow, UITheme.Label, 335f, 900f, UITheme.EyebrowSpacing);
-        Centered(layer, "Title", "PAUSE", UITheme.TitleLarge * 1.35f, UITheme.White, 235f, 1200f, 2f, FontStyles.Bold);
+        Centered(layer, "Eyebrow", "GAME PAUSED", UITheme.Eyebrow, UITheme.Label, 335f, 900f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
+        Centered(layer, "Title", "PAUSE", UITheme.TitleLarge * 1.35f, UITheme.White, 235f, 1200f, 2f, FontStyles.Bold, UIFontRole.Display);
         Divider(layer, "Divider", new Vector2(0f, 150f), new Vector2(560f, 1f));
 
         RectTransform stats = Block(layer, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0f, 78f), new Vector2(960f, 100f));
@@ -243,7 +242,7 @@ public static class GameplayUIBuilder
         }
 
         // Filled at runtime from the scene's LevelInfo, never baked in here.
-        TMP_Text footer = Centered(layer, "Footer", string.Empty, 18f, UITheme.Dim, -430f, 900f, 8f);
+        TMP_Text footer = Centered(layer, "Footer", string.Empty, 18f, UITheme.Dim, -430f, 900f, 8f, fontRole: UIFontRole.Mono);
 
         PauseMenuView view = layer.gameObject.AddComponent<PauseMenuView>();
         SetRef(view, "footer", footer);
@@ -269,11 +268,11 @@ public static class GameplayUIBuilder
         RectTransform pill = PanelBox(layer, "Pill", new Vector2(0.5f, 0.5f), new Vector2(0f, 385f), new Vector2(340f, 50f),
             new Color(0.14f, 0.055f, 0.025f, 0.95f),
             new Color(UITheme.Orange.r, UITheme.Orange.g, UITheme.Orange.b, 0.60f));
-        TMP_Text pillText = Text(pill, "Text", "RUN TERMINATED", 22f, UITheme.Orange, TextAlignmentOptions.Center, UITheme.EyebrowSpacing);
+        TMP_Text pillText = Text(pill, "Text", "RUN TERMINATED", 22f, UITheme.Orange, TextAlignmentOptions.Center, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)pillText.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(310f, 30f));
 
-        TMP_Text top = Centered(layer, "HeadlineTop", "FALL", 108f, UITheme.White, 262f, 1400f, 4f, FontStyles.Bold);
-        TMP_Text bottom = Centered(layer, "HeadlineBottom", "DETECTED", 150f, UITheme.Orange, 135f, 1600f, 4f, FontStyles.Bold);
+        TMP_Text top = Centered(layer, "HeadlineTop", "FALL", 108f, UITheme.White, 262f, 1400f, 4f, FontStyles.Bold, UIFontRole.Display);
+        TMP_Text bottom = Centered(layer, "HeadlineBottom", "DETECTED", 150f, UITheme.Orange, 135f, 1600f, 4f, FontStyles.Bold, UIFontRole.Display);
         ((RectTransform)bottom.transform).sizeDelta = new Vector2(1600f, 190f);
 
         Divider(layer, "Divider", new Vector2(0f, 42f), new Vector2(620f, 1f));
@@ -287,11 +286,11 @@ public static class GameplayUIBuilder
 
         RectTransform cause = PanelBox(layer, "Cause", new Vector2(0.5f, 0.5f), new Vector2(0f, -195f), new Vector2(660f, 150f),
             UITheme.PanelFill, UITheme.PanelBorder);
-        TMP_Text causeLabel = Text(cause, "Label", "FAILURE CAUSE", 19f, UITheme.Orange, TextAlignmentOptions.TopLeft, 8f);
+        TMP_Text causeLabel = Text(cause, "Label", "FAILURE CAUSE", 19f, UITheme.Orange, TextAlignmentOptions.TopLeft, 8f, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)causeLabel.transform, new Vector2(0f, 1f), new Vector2(26f, -22f), new Vector2(560f, 24f));
-        TMP_Text causeHead = Text(cause, "Headline", "-", 24f, UITheme.White, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold);
+        TMP_Text causeHead = Text(cause, "Headline", "-", 24f, UITheme.White, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)causeHead.transform, new Vector2(0f, 1f), new Vector2(26f, -56f), new Vector2(568f, 30f));
-        TMP_Text causeTip = Text(cause, "Tip", "-", 19f, UITheme.Dim, TextAlignmentOptions.TopLeft, 1f);
+        TMP_Text causeTip = Text(cause, "Tip", "-", 19f, UITheme.Dim, TextAlignmentOptions.TopLeft, 1f, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)causeTip.transform, new Vector2(0f, 1f), new Vector2(26f, -92f), new Vector2(568f, 50f));
 
         // Three equal buttons, symmetric about centre.
@@ -324,10 +323,10 @@ public static class GameplayUIBuilder
         RectTransform layer = Layer(root, "LevelComplete", true, out UIPanel panel);
         Scrim(layer, UITheme.Scrim);
 
-        Centered(layer, "Eyebrow", "STAGE CLEARED", UITheme.Eyebrow, UITheme.Cyan, 405f, 900f, UITheme.EyebrowSpacing);
+        Centered(layer, "Eyebrow", "STAGE CLEARED", UITheme.Eyebrow, UITheme.Cyan, 405f, 900f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
         // Placeholders only - LevelCompleteView.Bind writes the real strings from LevelInfo.
-        TMP_Text name = Centered(layer, "StageName", "LEVEL", 104f, UITheme.White, 310f, 1600f, 2f, FontStyles.Bold);
-        TMP_Text sub = Centered(layer, "Subtitle", string.Empty, 24f, UITheme.Label, 232f, 900f, 4f);
+        TMP_Text name = Centered(layer, "StageName", "LEVEL", 104f, UITheme.White, 310f, 1600f, 2f, FontStyles.Bold, UIFontRole.Display);
+        TMP_Text sub = Centered(layer, "Subtitle", string.Empty, 24f, UITheme.Label, 232f, 900f, 4f, fontRole: UIFontRole.Mono);
 
         RectTransform starRow = Block(layer, "Stars", new Vector2(0.5f, 0.5f), new Vector2(0f, 170f), new Vector2(300f, 50f));
         List<Image> stars = new List<Image>();
@@ -351,13 +350,13 @@ public static class GameplayUIBuilder
                 new Vector2(0f, 90f - i * 84f), new Vector2(700f, 80f),
                 i % 2 == 0 ? UITheme.PanelFill : UITheme.PanelFillSoft, UITheme.PanelBorder);
 
-            TMP_Text l = Text(row, "Label", labels[i], 20f, UITheme.Label, TextAlignmentOptions.TopLeft, 6f);
+            TMP_Text l = Text(row, "Label", labels[i], 20f, UITheme.Label, TextAlignmentOptions.TopLeft, 6f, fontRole: UIFontRole.Mono);
             Anchor((RectTransform)l.transform, new Vector2(0f, 1f), new Vector2(28f, -18f), new Vector2(420f, 24f));
 
-            notes[i] = Text(row, "Note", "", 19f, UITheme.Green, TextAlignmentOptions.TopLeft, 1f);
+            notes[i] = Text(row, "Note", "", 19f, UITheme.Green, TextAlignmentOptions.TopLeft, 1f, fontRole: UIFontRole.Mono);
             Anchor((RectTransform)notes[i].transform, new Vector2(0f, 1f), new Vector2(28f, -44f), new Vector2(420f, 24f));
 
-            values[i] = Text(row, "Value", "-", 42f, UITheme.White, TextAlignmentOptions.Right, 0f, FontStyles.Bold);
+            values[i] = Text(row, "Value", "-", 42f, UITheme.White, TextAlignmentOptions.Right, 0f, FontStyles.Bold, UIFontRole.Display);
             Anchor((RectTransform)values[i].transform, new Vector2(1f, 0.5f), new Vector2(-28f, 0f), new Vector2(320f, 56f));
         }
 
@@ -536,19 +535,20 @@ public static class GameplayUIBuilder
     }
 
     private static TMP_Text Text(RectTransform parent, string name, string content, float size, Color colour,
-        TextAlignmentOptions align, float spacing, FontStyles style = FontStyles.Normal)
+        TextAlignmentOptions align, float spacing, FontStyles style = FontStyles.Normal,
+        UIFontRole fontRole = UIFontRole.Body)
     {
         GameObject go = new GameObject(name, typeof(RectTransform));
         go.transform.SetParent(parent, false);
 
         TextMeshProUGUI t = go.AddComponent<TextMeshProUGUI>();
-        t.font = font;
+        t.font = fonts.Resolve(fontRole);
         t.text = content;
         t.fontSize = size;
         t.color = colour;
         t.alignment = align;
         t.characterSpacing = spacing;
-        t.fontStyle = style;
+        t.fontStyle = fontRole == UIFontRole.Display ? style & ~FontStyles.Bold : style;
         t.raycastTarget = false;
         t.textWrappingMode = TextWrappingModes.Normal;
         t.overflowMode = TextOverflowModes.Overflow;
@@ -556,9 +556,10 @@ public static class GameplayUIBuilder
     }
 
     private static TMP_Text Centered(RectTransform parent, string name, string content, float size, Color colour,
-        float y, float width, float spacing, FontStyles style = FontStyles.Normal)
+        float y, float width, float spacing, FontStyles style = FontStyles.Normal,
+        UIFontRole fontRole = UIFontRole.Body)
     {
-        TMP_Text t = Text(parent, name, content, size, colour, TextAlignmentOptions.Center, spacing, style);
+        TMP_Text t = Text(parent, name, content, size, colour, TextAlignmentOptions.Center, spacing, style, fontRole);
         Anchor((RectTransform)t.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(width, size * 1.35f));
         return t;
     }
@@ -572,9 +573,9 @@ public static class GameplayUIBuilder
         out TMP_Text labelText, out TMP_Text valueText, float width = 270f, float valueSize = UITheme.StatValue)
     {
         RectTransform col = Block(parent, name, new Vector2(0.5f, 0.5f), new Vector2(x, 0f), new Vector2(width, 100f));
-        labelText = Text(col, "Label", label, UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.Center, UITheme.LabelSpacing);
+        labelText = Text(col, "Label", label, UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.Center, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)labelText.transform, new Vector2(0.5f, 1f), new Vector2(0f, 0f), new Vector2(width, 26f));
-        valueText = Text(col, "Value", "-", valueSize, valueColour, TextAlignmentOptions.Center, 0f, FontStyles.Bold);
+        valueText = Text(col, "Value", "-", valueSize, valueColour, TextAlignmentOptions.Center, 0f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)valueText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -34f), new Vector2(width, 60f));
     }
 
@@ -593,7 +594,7 @@ public static class GameplayUIBuilder
         fillRt.offsetMax = new Vector2(-1f, -1f);
         fill.raycastTarget = true;                       // the click surface
 
-        TMP_Text label = Text(rt, "Label", caption, UITheme.ButtonLabel, UITheme.White, align, 4f, FontStyles.Bold);
+        TMP_Text label = Text(rt, "Label", caption, UITheme.ButtonLabel, UITheme.White, align, 4f, FontStyles.Bold, UIFontRole.Display);
         RectTransform labelRt = (RectTransform)label.transform;
         Stretch(labelRt);
         labelRt.offsetMin = new Vector2(align == TextAlignmentOptions.Left ? 36f : 12f, 0f);

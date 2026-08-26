@@ -20,7 +20,7 @@ public static class MainMenuBuilder
     private const string ScenePath = "Assets/Scenes/MainMenu.unity";
     private const string PreviewFolder = "Assets/UI/Previews/";
 
-    private static TMP_FontAsset font;
+    private static UIFontSet fonts;
 
     [MenuItem("Tools/Parkour UI/Build Main Menu Scene")]
     public static void Build()
@@ -31,10 +31,9 @@ public static class MainMenuBuilder
             return;
         }
 
-        font = TMP_Settings.defaultFontAsset;
-        if (font == null)
+        if (!UIFontCatalog.TryLoad(out fonts))
         {
-            Debug.LogError("[Menu] TMP Essential Resources are not imported.");
+            Debug.LogError("[Menu] UI font assets could not be loaded.");
             return;
         }
 
@@ -161,13 +160,13 @@ public static class MainMenuBuilder
         fadeRt.sizeDelta = new Vector2(260f, 0f);
 
         // ---- identity block
-        TopLeft(Text(layer, "Eyebrow", "URBAN VELOCITY", 24f, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing),
+        TopLeft(Text(layer, "Eyebrow", "URBAN VELOCITY", 24f, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
             64f, 92f, 700f, 30f);
         // Two lines, white over cyan, sized to sit inside the 810-wide left column: "SKYBOUND"
         // is eight caps where "VER" was three, so the point size drops to keep it off the edge.
-        TopLeft(Text(layer, "TitleTop", "SKYBOUND", 100f, UITheme.White, TextAlignmentOptions.TopLeft, 4f, FontStyles.Bold),
+        TopLeft(Text(layer, "TitleTop", "SKYBOUND", 100f, UITheme.White, TextAlignmentOptions.TopLeft, 4f, FontStyles.Bold, UIFontRole.Display),
             60f, 140f, 740f, 120f);
-        TopLeft(Text(layer, "TitleBottom", "TRIALS", 100f, UITheme.CyanBright, TextAlignmentOptions.TopLeft, 4f, FontStyles.Bold),
+        TopLeft(Text(layer, "TitleBottom", "TRIALS", 100f, UITheme.CyanBright, TextAlignmentOptions.TopLeft, 4f, FontStyles.Bold, UIFontRole.Display),
             60f, 248f, 740f, 120f);
 
         Image rule = Img(layer, "Rule", new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.35f));
@@ -188,9 +187,9 @@ public static class MainMenuBuilder
         // ---- current zone, bottom right over the photo
         RectTransform zone = Block(layer, "CurrentZone", new Vector2(1f, 0f), new Vector2(-64f, 64f), new Vector2(620f, 110f));
         zone.pivot = new Vector2(1f, 0f);
-        TMP_Text zoneLabel = Text(zone, "Label", "CURRENT ZONE", 20f, UITheme.Cyan, TextAlignmentOptions.Right, UITheme.LabelSpacing);
+        TMP_Text zoneLabel = Text(zone, "Label", "CURRENT ZONE", 20f, UITheme.Cyan, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)zoneLabel.transform, new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(620f, 26f));
-        refs.CurrentZone = Text(zone, "Value", "-", 52f, UITheme.White, TextAlignmentOptions.Right, 0f, FontStyles.Bold);
+        refs.CurrentZone = Text(zone, "Value", "-", 52f, UITheme.White, TextAlignmentOptions.Right, 0f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)refs.CurrentZone.transform, new Vector2(1f, 1f), new Vector2(0f, -32f), new Vector2(620f, 66f));
 
         return refs;
@@ -211,10 +210,10 @@ public static class MainMenuBuilder
         Image edge = Img(rt, "Edge", new Color(1f, 1f, 1f, 0.05f));
         Anchor((RectTransform)edge.transform, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(700f, 1f));
 
-        TMP_Text big = Text(rt, "Label", label, 60f, UITheme.White, TextAlignmentOptions.Left, 2f, FontStyles.Bold);
+        TMP_Text big = Text(rt, "Label", label, 60f, UITheme.White, TextAlignmentOptions.Left, 2f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)big.transform, new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(400f, 74f));
 
-        TMP_Text small = Text(rt, "Caption", caption, 20f, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing);
+        TMP_Text small = Text(rt, "Caption", caption, 20f, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)small.transform, new Vector2(1f, 0.5f), new Vector2(-32f, 0f), new Vector2(320f, 28f));
 
         Button button = rt.gameObject.AddComponent<Button>();
@@ -247,11 +246,11 @@ public static class MainMenuBuilder
         Image bg = Img(layer, "Background", new Color(0.027f, 0.031f, 0.039f, 0.985f));
         Stretch((RectTransform)bg.transform);
 
-        TopLeft(Text(layer, "Eyebrow", "STAGE SELECT", 24f, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing),
+        TopLeft(Text(layer, "Eyebrow", "STAGE SELECT", 24f, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
             64f, 74f, 700f, 30f);
-        TopLeft(Text(layer, "TitleTop", "CHOOSE YOUR", 88f, UITheme.White, TextAlignmentOptions.TopLeft, 3f, FontStyles.Bold),
+        TopLeft(Text(layer, "TitleTop", "CHOOSE YOUR", 88f, UITheme.White, TextAlignmentOptions.TopLeft, 3f, FontStyles.Bold, UIFontRole.Display),
             60f, 108f, 1200f, 106f);
-        TopLeft(Text(layer, "TitleBottom", "DISTRICT", 88f, UITheme.CyanBright, TextAlignmentOptions.TopLeft, 3f, FontStyles.Bold),
+        TopLeft(Text(layer, "TitleBottom", "DISTRICT", 88f, UITheme.CyanBright, TextAlignmentOptions.TopLeft, 3f, FontStyles.Bold, UIFontRole.Display),
             60f, 202f, 1200f, 106f);
 
         Image rule = Img(layer, "Rule", new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.30f));
@@ -259,7 +258,7 @@ public static class MainMenuBuilder
 
         SelectRefs refs = new SelectRefs { Cards = new List<LevelCardView>() };
 
-        refs.Cleared = Text(layer, "Cleared", "0 / 0 CLEARED", 22f, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing);
+        refs.Cleared = Text(layer, "Cleared", "0 / 0 CLEARED", 22f, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)refs.Cleared.transform, new Vector2(1f, 1f), new Vector2(-64f, -296f), new Vector2(600f, 28f));
 
         for (int i = 0; i < Mathf.Max(levelCount, 2); i++)
@@ -294,15 +293,15 @@ public static class MainMenuBuilder
         Image previewDim = Img(rt, "PreviewDim", new Color(0.02f, 0.025f, 0.03f, 0.25f));
         Anchor((RectTransform)previewDim.transform, new Vector2(0.5f, 1f), new Vector2(0f, -1f), new Vector2(cardW - 2f, 176f));
 
-        TMP_Text idx = Text(rt, "Index", "00", 24f, new Color(1f, 1f, 1f, 0.55f), TextAlignmentOptions.TopLeft, 6f, FontStyles.Bold);
+        TMP_Text idx = Text(rt, "Index", "00", 24f, new Color(1f, 1f, 1f, 0.55f), TextAlignmentOptions.TopLeft, 6f, FontStyles.Bold, UIFontRole.Mono);
         Anchor((RectTransform)idx.transform, new Vector2(0f, 1f), new Vector2(18f, -14f), new Vector2(120f, 30f));
 
         // Title gets the full card width: "INDUSTRIAL PARKOUR" at bold 32 overruns a 340 box and
         // collides with the rating marks, so the stars sit on their own row underneath instead.
-        TMP_Text title = Text(rt, "Title", "LEVEL", 28f, UITheme.White, TextAlignmentOptions.TopLeft, 1f, FontStyles.Bold);
+        TMP_Text title = Text(rt, "Title", "LEVEL", 28f, UITheme.White, TextAlignmentOptions.TopLeft, 1f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(22f, -194f), new Vector2(cardW - 44f, 38f));
 
-        TMP_Text sub = Text(rt, "Subtitle", "", 19f, UITheme.Label, TextAlignmentOptions.TopLeft, 2f);
+        TMP_Text sub = Text(rt, "Subtitle", "", 19f, UITheme.Label, TextAlignmentOptions.TopLeft, 2f, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)sub.transform, new Vector2(0f, 1f), new Vector2(22f, -230f), new Vector2(cardW - 44f, 26f));
 
         List<Image> stars = new List<Image>();
@@ -318,14 +317,14 @@ public static class MainMenuBuilder
         Image div = Img(rt, "Divider", new Color(1f, 1f, 1f, 0.07f));
         Anchor((RectTransform)div.transform, new Vector2(0.5f, 1f), new Vector2(0f, -286f), new Vector2(cardW - 44f, 1f));
 
-        TMP_Text bestLabel = Text(rt, "BestLabel", "BEST TIME", 17f, UITheme.Label, TextAlignmentOptions.TopLeft, UITheme.LabelSpacing);
+        TMP_Text bestLabel = Text(rt, "BestLabel", "BEST TIME", 17f, UITheme.Label, TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)bestLabel.transform, new Vector2(0f, 1f), new Vector2(22f, -304f), new Vector2(220f, 22f));
-        TMP_Text bestValue = Text(rt, "BestValue", "--:--.--", 28f, UITheme.Dim, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold);
+        TMP_Text bestValue = Text(rt, "BestValue", "--:--.--", 28f, UITheme.Dim, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)bestValue.transform, new Vector2(0f, 1f), new Vector2(22f, -330f), new Vector2(240f, 38f));
 
-        TMP_Text statusLabel = Text(rt, "StatusLabel", "STATUS", 17f, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing);
+        TMP_Text statusLabel = Text(rt, "StatusLabel", "STATUS", 17f, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)statusLabel.transform, new Vector2(1f, 1f), new Vector2(-22f, -304f), new Vector2(220f, 22f));
-        TMP_Text statusValue = Text(rt, "StatusValue", "AVAILABLE", 22f, UITheme.Label, TextAlignmentOptions.Right, 2f, FontStyles.Bold);
+        TMP_Text statusValue = Text(rt, "StatusValue", "AVAILABLE", 22f, UITheme.Label, TextAlignmentOptions.Right, 2f, FontStyles.Bold, UIFontRole.Mono);
         Anchor((RectTransform)statusValue.transform, new Vector2(1f, 1f), new Vector2(-22f, -332f), new Vector2(240f, 32f));
 
         Button button = rt.gameObject.AddComponent<Button>();
@@ -365,7 +364,7 @@ public static class MainMenuBuilder
         fillRt.offsetMax = new Vector2(-1f, -1f);
         fill.raycastTarget = true;
 
-        TMP_Text label = Text(rt, "Label", caption, 26f, UITheme.White, TextAlignmentOptions.Center, 4f, FontStyles.Bold);
+        TMP_Text label = Text(rt, "Label", caption, 26f, UITheme.White, TextAlignmentOptions.Center, 4f, FontStyles.Bold, UIFontRole.Display);
         Stretch((RectTransform)label.transform);
 
         Button button = rt.gameObject.AddComponent<Button>();
@@ -407,22 +406,22 @@ public static class MainMenuBuilder
         // brand mark
         Image tick = Img(layer, "BrandTick", UITheme.Cyan);
         TopLeft((RectTransform)tick.transform, 64f, 60f, 6f, 26f);
-        TopLeft(Text(layer, "Brand", "VERTEX", 24f, UITheme.White, TextAlignmentOptions.TopLeft, 8f, FontStyles.Bold),
+        TopLeft(Text(layer, "Brand", "VERTEX", 24f, UITheme.White, TextAlignmentOptions.TopLeft, 8f, FontStyles.Bold, UIFontRole.Display),
             82f, 58f, 400f, 30f);
 
-        TopLeft(Text(layer, "Eyebrow", "LOADING STAGE", 24f, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing),
+        TopLeft(Text(layer, "Eyebrow", "LOADING STAGE", 24f, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
             64f, 186f, 900f, 30f);
 
-        TMP_Text name = Text(layer, "LevelName", "LEVEL", 104f, UITheme.White, TextAlignmentOptions.TopLeft, 3f, FontStyles.Bold);
+        TMP_Text name = Text(layer, "LevelName", "LEVEL", 104f, UITheme.White, TextAlignmentOptions.TopLeft, 3f, FontStyles.Bold, UIFontRole.Display);
         TopLeft(name, 60f, 226f, 1400f, 124f);
 
-        TMP_Text sub = Text(layer, "Subtitle", "", 30f, UITheme.Label, TextAlignmentOptions.TopLeft, 4f);
+        TMP_Text sub = Text(layer, "Subtitle", "", 30f, UITheme.Label, TextAlignmentOptions.TopLeft, 4f, fontRole: UIFontRole.Mono);
         TopLeft(sub, 64f, 366f, 1200f, 40f);
 
         // small record strip
-        TopLeft(Text(layer, "BestLabel", "YOUR BEST", 18f, UITheme.Label, TextAlignmentOptions.TopLeft, UITheme.LabelSpacing),
+        TopLeft(Text(layer, "BestLabel", "YOUR BEST", 18f, UITheme.Label, TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
             64f, 442f, 300f, 24f);
-        TMP_Text best = Text(layer, "BestValue", "--:--.--", 30f, UITheme.Dim, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold);
+        TMP_Text best = Text(layer, "BestValue", "--:--.--", 30f, UITheme.Dim, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
         TopLeft(best, 64f, 468f, 300f, 40f);
 
         RawImage preview = Raw(layer, "Preview", null);
@@ -431,10 +430,10 @@ public static class MainMenuBuilder
         TopLeft((RectTransform)previewEdge.transform, 64f, 846f, 760f, 1f);
 
         // bottom progress strip
-        TMP_Text status = Text(layer, "Status", "PREPARING", 20f, UITheme.Label, TextAlignmentOptions.Left, UITheme.LabelSpacing);
+        TMP_Text status = Text(layer, "Status", "PREPARING", 20f, UITheme.Label, TextAlignmentOptions.Left, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)status.transform, new Vector2(0f, 0f), new Vector2(64f, 132f), new Vector2(900f, 26f));
 
-        TMP_Text percent = Text(layer, "Percent", "0%", 20f, UITheme.Label, TextAlignmentOptions.Right, 2f);
+        TMP_Text percent = Text(layer, "Percent", "0%", 20f, UITheme.Label, TextAlignmentOptions.Right, 2f, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)percent.transform, new Vector2(1f, 0f), new Vector2(-64f, 132f), new Vector2(300f, 26f));
 
         RectTransform track = Block(layer, "ProgressTrack", new Vector2(0.5f, 0f), new Vector2(0f, 116f), new Vector2(1792f, 5f));
@@ -453,7 +452,7 @@ public static class MainMenuBuilder
         fillImg.color = UITheme.CyanBright;
         fillImg.raycastTarget = false;
 
-        TMP_Text tip = Text(layer, "Tip", "", 20f, UITheme.Dim, TextAlignmentOptions.Left, 1f);
+        TMP_Text tip = Text(layer, "Tip", "", 20f, UITheme.Dim, TextAlignmentOptions.Left, 1f, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)tip.transform, new Vector2(0f, 0f), new Vector2(64f, 62f), new Vector2(1600f, 34f));
 
         SceneLoader loader = layer.gameObject.AddComponent<SceneLoader>();
@@ -546,19 +545,20 @@ public static class MainMenuBuilder
     }
 
     private static TMP_Text Text(RectTransform parent, string name, string content, float size, Color colour,
-        TextAlignmentOptions align, float spacing, FontStyles style = FontStyles.Normal)
+        TextAlignmentOptions align, float spacing, FontStyles style = FontStyles.Normal,
+        UIFontRole fontRole = UIFontRole.Body)
     {
         GameObject go = new GameObject(name, typeof(RectTransform));
         go.transform.SetParent(parent, false);
 
         TextMeshProUGUI t = go.AddComponent<TextMeshProUGUI>();
-        t.font = font;
+        t.font = fonts.Resolve(fontRole);
         t.text = content;
         t.fontSize = size;
         t.color = colour;
         t.alignment = align;
         t.characterSpacing = spacing;
-        t.fontStyle = style;
+        t.fontStyle = fontRole == UIFontRole.Display ? style & ~FontStyles.Bold : style;
         t.raycastTarget = false;
         t.textWrappingMode = TextWrappingModes.NoWrap;
         t.overflowMode = TextOverflowModes.Overflow;
