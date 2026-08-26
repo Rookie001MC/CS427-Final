@@ -166,7 +166,8 @@ public sealed class MenuController : MonoBehaviour
         int cleared = 0;
         for (int i = 0; i < levels.Count; i++)
         {
-            if (levels[i] != null && RunStatsTracker.TryGetBest(levels[i].RecordKey, out _))
+            if (levels[i] != null && RunStatsTracker.TryGetBest(
+                levels[i].RecordKey, GameMode.Checkpoint, out _))
             {
                 cleared++;
             }

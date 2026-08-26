@@ -64,8 +64,7 @@ public sealed class LevelCardView : MonoBehaviour
             preview.enabled = entry.Preview != null;
         }
 
-        // Session-only for now; the card must read correctly when no record exists at all.
-        bool hasBest = RunStatsTracker.TryGetBest(entry.RecordKey, out float best);
+        bool hasBest = RunStatsTracker.TryGetBest(entry.RecordKey, GameMode.Checkpoint, out float best);
 
         if (bestValue != null)
         {

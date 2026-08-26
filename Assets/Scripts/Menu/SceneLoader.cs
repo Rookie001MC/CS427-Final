@@ -90,7 +90,7 @@ public sealed class SceneLoader : MonoBehaviour
 
         if (bestValue != null)
         {
-            bool has = RunStatsTracker.TryGetBest(level.RecordKey, out float best);
+            bool has = RunStatsTracker.TryGetBest(level.RecordKey, GameMode.Checkpoint, out float best);
             bestValue.text = has ? RunTimer.Format(best) : "--:--.--";
             bestValue.color = has ? UITheme.Cyan : UITheme.Dim;
         }

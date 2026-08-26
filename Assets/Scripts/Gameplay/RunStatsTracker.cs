@@ -5,18 +5,11 @@ using UnityEngine;
 /// Derived run statistics that the HUD and end-of-run panels read: live speed, peak speed, and
 /// the session's best finish time and per-checkpoint splits.
 ///
-/// Records are keyed by <see cref="LevelInfo.RecordKey"/>, so two levels loaded in the same
-/// session never share a "personal best". They are held in memory only - this is not the save
-/// system; Phase 5 replaces the store behind these accessors with persisted values.
+/// Records are keyed by <see cref="LevelInfo.RecordKey"/> and the active <see cref="GameMode"/>,
+/// so the two modes retain independent persistent personal bests.
 /// </summary>
 public sealed class RunStatsTracker : MonoBehaviour
 {
-    private sealed class LevelRecord
-    {
-        public float BestTime = -1f;
-        public readonly List<float> BestSplits = new List<float>();
-    }
-
     [SerializeField] private CharacterController playerController;
     [SerializeField] private CheckpointManager checkpoints;
     [SerializeField] private LevelInfo levelInfo;
@@ -25,8 +18,6 @@ public sealed class RunStatsTracker : MonoBehaviour
              "last Move delta, so a respawn teleport reports a huge bogus speed for one frame.")]
     [SerializeField, Min(1f)] private float plausibleSpeedCeiling = 40f;
 
-    private static readonly Dictionary<string, LevelRecord> Records = new Dictionary<string, LevelRecord>();
-
     /// <summary>Horizontal speed in m/s. Vertical fall speed is excluded deliberately.</summary>
     public float CurrentSpeed { get; private set; }
 
@@ -34,43 +25,20 @@ public sealed class RunStatsTracker : MonoBehaviour
     public float MaxSpeed { get; private set; }
 
     private string Key => levelInfo != null ? levelInfo.RecordKey : gameObject.scene.name;
+    private GameMode Mode => RunSession.ActiveMode;
+    private RunRecordStore Store => RunRecordStore.Default;
 
-    private LevelRecord Record
-    {
-        get
-        {
-            string key = Key;
-            if (!Records.TryGetValue(key, out LevelRecord record))
-            {
-                record = new LevelRecord();
-                Records[key] = record;
-            }
+    /// <summary>Best finish time for this level and mode, or -1 when none has been set.</summary>
+    public float BestTime =>
+        Store.TryGetBest(Key, Mode, out float bestTime) ? bestTime : -1f;
 
-            return record;
-        }
-    }
+    public bool HasBest => Store.TryGetBest(Key, Mode, out _);
 
-    /// <summary>Best finish time for this level this session, or -1 when none has been set.</summary>
-    public float BestTime => Record.BestTime;
+    public static bool TryGetBest(string recordKey, GameMode mode, out float bestTime) =>
+        RunRecordStore.Default.TryGetBest(recordKey, mode, out bestTime);
 
-    public bool HasBest => Record.BestTime >= 0f;
-
-    /// <summary>
-    /// Reads a level's session best without needing its scene loaded, so the menu can show a
-    /// record set earlier in the same session. Still memory-only - Phase 5 replaces the store.
-    /// </summary>
-    public static bool TryGetBest(string recordKey, out float bestTime)
-    {
-        bestTime = -1f;
-
-        if (string.IsNullOrEmpty(recordKey) || !Records.TryGetValue(recordKey, out LevelRecord record))
-        {
-            return false;
-        }
-
-        bestTime = record.BestTime;
-        return bestTime >= 0f;
-    }
+    public static int CountCompletedModes(string recordKey) =>
+        RunRecordStore.Default.CountCompletedModes(recordKey);
 
     private void Update()
     {
@@ -110,9 +78,7 @@ public sealed class RunStatsTracker : MonoBehaviour
     /// </summary>
     public float GetBestSplit(int oneBasedIndex)
     {
-        List<float> splits = Record.BestSplits;
-        int i = oneBasedIndex - 1;
-        return i >= 0 && i < splits.Count ? splits[i] : -1f;
+        return Store.GetBestSplit(Key, Mode, oneBasedIndex);
     }
 
     /// <summary>
@@ -122,16 +88,7 @@ public sealed class RunStatsTracker : MonoBehaviour
     /// <returns>True when this run set a new best for this level.</returns>
     public bool CommitFinishedRun(float finishTime)
     {
-        LevelRecord record = Record;
-
-        if (record.BestTime >= 0f && finishTime >= record.BestTime)
-        {
-            return false;
-        }
-
-        record.BestTime = finishTime;
-        record.BestSplits.Clear();
-
+        var sectionSplits = new List<float>();
         if (checkpoints != null)
         {
             IReadOnlyList<float> cumulative = checkpoints.CumulativeTimes;
@@ -139,11 +96,11 @@ public sealed class RunStatsTracker : MonoBehaviour
 
             for (int i = 0; i < cumulative.Count; i++)
             {
-                record.BestSplits.Add(cumulative[i] - previous);
+                sectionSplits.Add(cumulative[i] - previous);
                 previous = cumulative[i];
             }
         }
 
-        return true;
+        return Store.Commit(Key, Mode, finishTime, sectionSplits);
     }
 }
