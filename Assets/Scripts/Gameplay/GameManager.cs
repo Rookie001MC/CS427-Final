@@ -9,6 +9,9 @@ using UnityEngine;
 /// </summary>
 public sealed class GameManager : MonoBehaviour
 {
+    // Kept code-only so the recovery penalty is identical across every checkpoint course.
+    private const int CheckpointRecoverySeconds = 3;
+
     [Header("Systems")]
     [SerializeField] private RunTimer runTimer;
     [SerializeField] private CheckpointManager checkpoints;
@@ -19,9 +22,6 @@ public sealed class GameManager : MonoBehaviour
     [Header("Countdown")]
     [SerializeField, Min(1)] private int countdownFrom = 3;
     [SerializeField, Min(0.05f)] private float countdownStepSeconds = 1f;
-
-    [Header("Behaviour")]
-    [SerializeField, Range(0.05f, 0.95f)] private float deathRecoverySeconds = 0.45f;
 
     public RunState State { get; private set; } = RunState.Idle;
     public int Deaths { get; private set; }
@@ -38,6 +38,9 @@ public sealed class GameManager : MonoBehaviour
 
     /// <summary>Countdown label: "3", "2", "1", then "GO!".</summary>
     public event Action<string> CountdownTick;
+
+    /// <summary>Whole seconds remaining before Checkpoint Mode respawns the player.</summary>
+    public event Action<int> RecoveryCountdownTick;
 
     public event Action RunStarted;
 
@@ -178,27 +181,42 @@ public sealed class GameManager : MonoBehaviour
         LastDeathReason = reason;
         SetState(RunState.Recovering);
 
+        bool awaitsDecision = Rules.DeathAction == DeathRecoveryAction.AwaitPlayerDecision;
+
+        if (runTimer != null && awaitsDecision)
+        {
+            runTimer.Stop();
+        }
+
         if (player != null)
         {
-            player.Freeze(true);
+            player.Freeze(!awaitsDecision);
+
+            if (awaitsDecision)
+            {
+                player.ReleaseCursor();
+            }
         }
 
         Debug.Log($"[Run] death #{Deaths} - {reason}.", this);
         PlayerDied?.Invoke(Deaths);
-        recoveryRoutine = StartCoroutine(RecoverAfterDeath());
+        if (!awaitsDecision)
+        {
+            recoveryRoutine = StartCoroutine(RecoverAfterDeath());
+        }
+
         return true;
     }
 
     private IEnumerator RecoverAfterDeath()
     {
-        yield return new WaitForSecondsRealtime(deathRecoverySeconds);
-        recoveryRoutine = null;
-
-        if (Rules.DeathAction == DeathRecoveryAction.RestartRun)
+        for (int remaining = CheckpointRecoverySeconds; remaining >= 1; remaining--)
         {
-            RestartRun();
-            yield break;
+            RecoveryCountdownTick?.Invoke(remaining);
+            yield return new WaitForSecondsRealtime(1f);
         }
+
+        recoveryRoutine = null;
 
         if (respawn != null) respawn.RespawnAtCheckpoint();
         if (fallDetector != null) fallDetector.Rearm();

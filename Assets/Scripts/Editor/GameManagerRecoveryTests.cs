@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -23,7 +24,7 @@ public sealed class GameManagerRecoveryTests
     {
         if (root != null)
         {
-            Object.Destroy(root);
+            UnityEngine.Object.Destroy(root);
         }
 
         RunSession.Clear();
@@ -31,9 +32,14 @@ public sealed class GameManagerRecoveryTests
     }
 
     [UnityTest]
-    public IEnumerator CheckpointRecovery_ContinuesTimerRespawnsLatestCheckpointAndRearmsFallDetection()
+    public IEnumerator CheckpointDeath_AutomaticallyRecoversAfterThreeSecondPenalty()
     {
-        Fixture fixture = BuildFixture(countdownStepSeconds: 0.01f, deathRecoverySeconds: 0.5f);
+        Fixture fixture = BuildFixture(countdownStepSeconds: 0.01f);
+        var recoveryTicks = new List<int>();
+        EventInfo recoveryTickEvent = typeof(GameManager).GetEvent("RecoveryCountdownTick");
+        Assert.That(recoveryTickEvent, Is.Not.Null);
+        recoveryTickEvent.AddEventHandler(fixture.Game, (Action<int>)recoveryTicks.Add);
+
         yield return WaitForState(fixture.Game, RunState.Running);
 
         Assert.That(Activate(fixture.Checkpoints, fixture.Checkpoint), Is.True);
@@ -47,13 +53,15 @@ public sealed class GameManagerRecoveryTests
         Assert.That(fixture.Game.Die("duplicate"), Is.False);
 
         float timerDuringRecovery = fixture.Timer.ElapsedSeconds;
-        yield return new WaitForSecondsRealtime(0.1f);
+        yield return new WaitForSecondsRealtime(2.75f);
 
         Assert.That(fixture.Game.State, Is.EqualTo(RunState.Recovering));
         Assert.That(fixture.Timer.ElapsedSeconds, Is.GreaterThan(timerDuringRecovery));
+        Assert.That(recoveryTicks, Is.EqualTo(new[] { 3, 2, 1 }));
 
-        yield return WaitForState(fixture.Game, RunState.Running);
+        yield return new WaitForSecondsRealtime(0.5f);
 
+        Assert.That(fixture.Game.State, Is.EqualTo(RunState.Running));
         Assert.That(fixture.Game.Deaths, Is.EqualTo(1));
         Assert.That(fixture.Checkpoints.Reached, Is.EqualTo(1));
         Assert.That(fixture.Timer.ElapsedSeconds, Is.GreaterThan(timerBeforeDeath));
@@ -62,7 +70,32 @@ public sealed class GameManagerRecoveryTests
     }
 
     [UnityTest]
-    public IEnumerator NoCheckpointRecovery_ResetsRunAndStartsFreshCountdown()
+    public IEnumerator NoCheckpointDeath_StopsTimerAndWaitsForDecision()
+    {
+        RunSession.Select(GameMode.NoCheckpoint, "recovery-test");
+        Fixture fixture = BuildFixture(countdownStepSeconds: 0.01f);
+        yield return WaitForState(fixture.Game, RunState.Running);
+
+        Assert.That(Activate(fixture.Checkpoints, fixture.Checkpoint), Is.True);
+        yield return null;
+        Assert.That(fixture.Timer.ElapsedSeconds, Is.GreaterThan(0f));
+
+        Assert.That(fixture.Game.Die("test death"), Is.True);
+        float stoppedAt = fixture.Timer.ElapsedSeconds;
+
+        Assert.That(fixture.Game.State, Is.EqualTo(RunState.Recovering));
+        Assert.That(fixture.Game.Deaths, Is.EqualTo(1));
+        Assert.That(fixture.Checkpoints.Reached, Is.EqualTo(1));
+        Assert.That(fixture.Timer.IsRunning, Is.False);
+
+        yield return new WaitForSecondsRealtime(0.75f);
+
+        Assert.That(fixture.Game.State, Is.EqualTo(RunState.Recovering));
+        Assert.That(fixture.Timer.ElapsedSeconds, Is.EqualTo(stoppedAt).Within(0.01f));
+    }
+
+    [UnityTest]
+    public IEnumerator RetryAfterNoCheckpointDeath_ResetsRunAndStartsFreshCountdown()
     {
         RunSession.Select(GameMode.NoCheckpoint, "recovery-test");
         Fixture fixture = BuildFixture(countdownStepSeconds: 0.3f);
@@ -73,14 +106,10 @@ public sealed class GameManagerRecoveryTests
 
         Assert.That(Activate(fixture.Checkpoints, fixture.Checkpoint), Is.True);
         yield return null;
-        Assert.That(fixture.Timer.ElapsedSeconds, Is.GreaterThan(0f));
-
         Assert.That(fixture.Game.Die("test death"), Is.True);
-        Assert.That(fixture.Game.State, Is.EqualTo(RunState.Recovering));
-        Assert.That(fixture.Game.Deaths, Is.EqualTo(1));
-        Assert.That(fixture.Checkpoints.Reached, Is.EqualTo(1));
 
-        yield return new WaitForSecondsRealtime(0.1f);
+        fixture.Game.RestartRun();
+        yield return null;
 
         Assert.That(fixture.Game.State, Is.EqualTo(RunState.Countdown));
         Assert.That(fixture.Game.Deaths, Is.Zero);
@@ -91,7 +120,7 @@ public sealed class GameManagerRecoveryTests
         Assert.That(restartedCountdownTicks, Is.EqualTo(new[] { "1" }));
     }
 
-    private Fixture BuildFixture(float countdownStepSeconds, float deathRecoverySeconds = 0.05f)
+    private Fixture BuildFixture(float countdownStepSeconds)
     {
         root = new GameObject("~GameManagerRecoveryTests");
         root.SetActive(false);
@@ -135,8 +164,6 @@ public sealed class GameManagerRecoveryTests
         SetPrivate(game, "fallDetector", fallDetector);
         SetPrivate(game, "countdownFrom", 1);
         SetPrivate(game, "countdownStepSeconds", countdownStepSeconds);
-        SetPrivate(game, "deathRecoverySeconds", deathRecoverySeconds);
-
         root.SetActive(true);
 
         return new Fixture

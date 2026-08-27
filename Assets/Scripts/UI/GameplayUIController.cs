@@ -28,6 +28,7 @@ public sealed class GameplayUIController : MonoBehaviour
         {
             game.StateChanged += HandleStateChanged;
             game.CountdownTick += HandleCountdownTick;
+            game.RecoveryCountdownTick += HandleRecoveryCountdownTick;
             game.PlayerDied += HandlePlayerDied;
             game.RunFinished += HandleRunFinished;
         }
@@ -51,6 +52,7 @@ public sealed class GameplayUIController : MonoBehaviour
         {
             game.StateChanged -= HandleStateChanged;
             game.CountdownTick -= HandleCountdownTick;
+            game.RecoveryCountdownTick -= HandleRecoveryCountdownTick;
             game.PlayerDied -= HandlePlayerDied;
             game.RunFinished -= HandleRunFinished;
         }
@@ -116,6 +118,12 @@ public sealed class GameplayUIController : MonoBehaviour
             Bind(levelComplete.ReplayButton, RestartRun);
             Bind(levelComplete.LevelSelectButton, MenuNavigation.GoToLevelSelect);
             Bind(levelComplete.MainMenuButton, MenuNavigation.GoToMainMenu);
+        }
+
+        if (deathRecovery != null)
+        {
+            Bind(deathRecovery.RetryButton, RestartRun);
+            Bind(deathRecovery.MainMenuButton, MenuNavigation.GoToMainMenu);
         }
     }
 
@@ -241,6 +249,14 @@ public sealed class GameplayUIController : MonoBehaviour
         if (countdown != null)
         {
             countdown.Tick(label);
+        }
+    }
+
+    private void HandleRecoveryCountdownTick(int seconds)
+    {
+        if (deathRecovery != null)
+        {
+            deathRecovery.SetCountdown(seconds);
         }
     }
 

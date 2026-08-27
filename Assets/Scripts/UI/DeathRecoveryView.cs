@@ -1,9 +1,10 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
-/// Brief non-interactive feedback while <see cref="GameManager"/> performs automatic recovery.
-/// The view owns no recovery controls or run-state decisions.
+/// Mode-aware death overlay. Checkpoint Mode presents an automatic recovery countdown;
+/// No-Checkpoint Mode presents the two decisions that can follow a failed attempt.
 /// </summary>
 public sealed class DeathRecoveryView : MonoBehaviour
 {
@@ -12,6 +13,13 @@ public sealed class DeathRecoveryView : MonoBehaviour
     [SerializeField] private TMP_Text headline;
     [SerializeField] private TMP_Text detail;
     [SerializeField] private TMP_Text reasonValue;
+    [SerializeField] private TMP_Text countdownValue;
+    [SerializeField] private GameObject decisionActions;
+    [SerializeField] private Button retryButton;
+    [SerializeField] private Button mainMenuButton;
+
+    public Button RetryButton => retryButton;
+    public Button MainMenuButton => mainMenuButton;
 
     public void Show(GameMode mode, string reason, int reached, int total)
     {
@@ -27,11 +35,13 @@ public sealed class DeathRecoveryView : MonoBehaviour
             headline.text = rules.DeathHeadline;
         }
 
+        bool checkpointMode = mode == GameMode.Checkpoint;
+
         if (detail != null)
         {
-            detail.text = mode == GameMode.Checkpoint
+            detail.text = checkpointMode
                 ? $"RETURNING TO CHECKPOINT {reached} / {total}"
-                : "RETURNING TO LEVEL START";
+                : "THIS ATTEMPT HAS ENDED";
         }
 
         if (reasonValue != null)
@@ -41,9 +51,32 @@ public sealed class DeathRecoveryView : MonoBehaviour
                 : reason.ToUpperInvariant();
         }
 
+        if (countdownValue != null)
+        {
+            countdownValue.gameObject.SetActive(checkpointMode);
+        }
+
+        if (decisionActions != null)
+        {
+            decisionActions.SetActive(!checkpointMode);
+        }
+
+        if (checkpointMode)
+        {
+            SetCountdown(3);
+        }
+
         if (panel != null)
         {
             panel.SetVisible(true);
+        }
+    }
+
+    public void SetCountdown(int seconds)
+    {
+        if (countdownValue != null)
+        {
+            countdownValue.text = $"RESPAWNING IN {Mathf.Max(0, seconds)}";
         }
     }
 

@@ -272,8 +272,8 @@ public static class GameplayUIBuilder
 
     private static DeathRecoveryView BuildDeathRecovery(RectTransform root)
     {
-        RectTransform layer = Layer(root, "DeathRecovery", false, out UIPanel panel);
-        Scrim(layer, UITheme.ScrimLight);
+        RectTransform layer = Layer(root, "DeathRecovery", true, out UIPanel panel);
+        Scrim(layer, UITheme.Scrim);
 
         RectTransform pill = PanelBox(layer, "ModePill", new Vector2(0.5f, 0.5f),
             new Vector2(0f, 250f), new Vector2(440f, 52f),
@@ -289,10 +289,13 @@ public static class GameplayUIBuilder
         Divider(layer, "Divider", new Vector2(0f, -16f), new Vector2(660f, 1f));
 
         TMP_Text detail = Centered(layer, "Detail", "RETURNING TO CHECKPOINT 0 / 0", 27f,
-            UITheme.White, -92f, 1200f, 4f, fontRole: UIFontRole.Mono);
+            UITheme.White, -76f, 1200f, 4f, fontRole: UIFontRole.Mono);
+
+        TMP_Text countdown = Centered(layer, "Countdown", "RESPAWNING IN 3", 32f,
+            UITheme.Cyan, -132f, 900f, 6f, FontStyles.Bold, UIFontRole.Mono);
 
         RectTransform reason = PanelBox(layer, "Reason", new Vector2(0.5f, 0.5f),
-            new Vector2(0f, -205f), new Vector2(760f, 110f),
+            new Vector2(0f, -225f), new Vector2(760f, 110f),
             UITheme.PanelFill, UITheme.PanelBorder);
         TMP_Text reasonLabel = Text(reason, "Label", "RECOVERY TRIGGER", 18f, UITheme.Orange,
             TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
@@ -303,12 +306,25 @@ public static class GameplayUIBuilder
         Anchor((RectTransform)reasonValue.transform, new Vector2(0f, 1f),
             new Vector2(28f, -50f), new Vector2(700f, 36f));
 
+        RectTransform actions = Block(layer, "Actions", new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -365f), new Vector2(760f, 90f));
+        Button retry = Btn(actions, "RetryRun", "RETRY RUN", new Vector2(-180f, 0f),
+            new Vector2(330f, 78f), MenuButtonVisual.Style.Primary, UITheme.CyanBright,
+            TextAlignmentOptions.Center);
+        Button mainMenu = Btn(actions, "MainMenu", "MAIN MENU", new Vector2(180f, 0f),
+            new Vector2(330f, 78f), MenuButtonVisual.Style.Outline, UITheme.Cyan,
+            TextAlignmentOptions.Center);
+
         DeathRecoveryView view = layer.gameObject.AddComponent<DeathRecoveryView>();
         SetRef(view, "panel", panel);
         SetRef(view, "eyebrow", eyebrow);
         SetRef(view, "headline", headline);
         SetRef(view, "detail", detail);
         SetRef(view, "reasonValue", reasonValue);
+        SetRef(view, "countdownValue", countdown);
+        SetRef(view, "decisionActions", actions.gameObject);
+        SetRef(view, "retryButton", retry);
+        SetRef(view, "mainMenuButton", mainMenu);
         return view;
     }
 

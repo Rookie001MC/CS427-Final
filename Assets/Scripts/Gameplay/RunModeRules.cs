@@ -3,7 +3,7 @@ using System;
 public enum DeathRecoveryAction
 {
     RespawnAtCheckpoint,
-    RestartRun
+    AwaitPlayerDecision
 }
 
 public readonly struct RunModeRules
@@ -30,8 +30,8 @@ public readonly struct RunModeRules
             DeathRecoveryAction.RespawnAtCheckpoint,
             "CHECKPOINT MODE", "CHECKPOINT", "RECOVERING"),
         GameMode.NoCheckpoint => new RunModeRules(mode,
-            DeathRecoveryAction.RestartRun,
-            "NO-CHECKPOINT MODE", "SPLIT", "RUN RESET"),
+            DeathRecoveryAction.AwaitPlayerDecision,
+            "NO-CHECKPOINT MODE", "SPLIT", "RUN FAILED"),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown game mode.")
     };
 }
