@@ -1,0 +1,178 @@
+SKYBOUND CITY - PHASE 6C TRAVERSAL (offline)
+Generated from CityPlan/CityTraversal/RoofGraph without opening the editor.
+The authoritative run is Tools > Skybound City > D, against the real colliders.
+
+buildings 108  slabs 304  blocks 9  ramps 9  colliders 429 / 1100
+links 16 (6 inter-district)  ascents 42  ways in 13  relays 5  graph nodes 128
+
+LINKS
+  link                          kind        span  bearing   deckY  declared  stairs   ends
+  Center-Residential Span      Skybridge    14.0     32.8   25.20  Green          1   CityCenter_B01(28.8) -> ResidentialWest_B42(25.2)
+  Center-Industrial Span       Skybridge    14.0     40.0   10.80  Green          1   CityCenter_B12(32.4) -> IndustrialYards_B10(10.8)
+  Center-Corporate Span        Skybridge    30.4     44.6   32.40  Green          1   CityCenter_B22(32.4) -> CorporateCore_B01(50.4)
+  Center-Tower Span            Skybridge    14.0     40.0   19.60  Green          1   CityCenter_B10(19.6) -> Tower_WingNorth(25.2)
+  Quarter-Residential Span     Skybridge    14.0     17.8   12.40  Green          1   OldQuarter_B15(12.4) -> ResidentialWest_B10(15.2)
+  Quarter-Tower Span           Skybridge    14.0     27.8   16.00  Green          1   OldQuarter_B53(16.0) -> Tower_WingWest(25.2)
+  Residential Ladder           Skybridge    14.0     21.2   19.60  Green          1   ResidentialWest_B24(25.2) -> ResidentialNorth_B20(19.6)
+  Yard Crane                   Crane        14.0     76.6   21.60  Blue           2   IndustrialYards_B20(12.4) -> IndustrialConstruction_B00(14.4)
+  Cut Span                     Skybridge    36.6     27.8   15.20  Green          1   OldQuarter_B23(15.2) -> OldQuarter_B43(16.0)
+  Corporate Spine              Skybridge    47.1     51.0   54.00  Green          1   CorporateCore_B00(54.0) -> CorporateSouth_B01(61.2)
+  Corporate Core North         Skybridge    39.5     53.7   50.40  Green          1   CorporateCore_B00(54.0) -> CorporateCore_B01(50.4)
+  Corporate Core East          Skybridge    39.5     45.9   54.00  Green          1   CorporateCore_B00(54.0) -> CorporateCore_B10(57.6)
+  Corporate Core Cross         Skybridge    39.5     61.7   46.80  Green          1   CorporateCore_B01(50.4) -> CorporateCore_B11(46.8)
+  Corporate South West         Skybridge    39.5     62.3   57.60  Green          1   CorporateSouth_B01(61.2) -> CorporateSouth_B00(57.6)
+  Corporate South East         Skybridge    39.5     45.4   57.60  Green          0   CorporateSouth_B00(57.6) -> CorporateSouth_B10(57.6)
+  Corporate South Cross        Skybridge    39.5     45.3   39.60  Green          1   CorporateSouth_B10(57.6) -> CorporateSouth_B11(39.6)
+
+ASCENTS
+  ascent                              kind          from      to  steps  rise/step  worst
+  Center-Residential Span (stair)     LinkStair      25.20   28.80      2       1.80  Orange
+  Center-Industrial Span (stair)      LinkStair      10.80   32.40     12       1.80  Orange
+  Center-Corporate Span (stair)       LinkStair      32.40   50.40     10       1.80  Orange
+  Center-Tower Span (stair)           LinkStair      19.60   25.20      4       1.40  Orange
+  Quarter-Residential Span (stair)    LinkStair      12.40   15.20      2       1.40  Orange
+  Quarter-Tower Span (stair)          LinkStair      16.00   25.20      6       1.53  Orange
+  Residential Ladder (stair)          LinkStair      19.60   25.20      4       1.40  Orange
+  Yard Crane (from stair)             LinkStair      12.40   21.60      6       1.53  Orange
+  Yard Crane (to stair)               LinkStair      14.40   21.60      4       1.80  Orange
+  Cut Span (stair)                    LinkStair      15.20   16.00      1       0.80  Blue
+  Corporate Spine (stair)             LinkStair      54.00   61.20      4       1.80  Orange
+  Corporate Core North (stair)        LinkStair      50.40   54.00      2       1.80  Orange
+  Corporate Core East (stair)         LinkStair      54.00   57.60      2       1.80  Orange
+  Corporate Core Cross (stair)        LinkStair      46.80   50.40      2       1.80  Orange
+  Corporate South West (stair)        LinkStair      57.60   61.20      2       1.80  Orange
+  Corporate South Cross (stair)       LinkStair      39.60   57.60     10       1.80  Orange
+  Center West Escape                  FireEscape      0.00   32.40     18       1.80  Orange
+  Center East Escape                  FireEscape      0.00   32.40     18       1.80  Orange
+  Center South Escape                 FireEscape      0.00   19.60     11       1.78  Orange
+  Residential West Escape             FireEscape      0.00   25.20     14       1.80  Orange
+  Residential South Escape            FireEscape      0.00   14.40      8       1.80  Orange
+  Residential North Escape            FireEscape      0.00   25.20     14       1.80  Orange
+  Yards West Escape                   FireEscape      0.00   11.60      7       1.66  Orange
+  Yards North Escape                  FireEscape      0.00   18.00     10       1.80  Orange
+  Construction Scaffold               Scaffold        0.00   14.40      8       1.80  Orange
+  Construction East Escape            FireEscape      0.00   15.20      9       1.69  Orange
+  Quarter West Escape                 FireEscape      0.00   16.00      9       1.78  Orange
+  Quarter East Escape                 FireEscape      0.00   18.00     10       1.80  Orange
+  Podium East Stair                   FireEscape      0.00   25.20     14       1.80  Orange
+  Center West Riser                   Riser          19.60   28.80      6       1.53  Orange
+  Center West Upper Riser             Riser          28.80   32.40      2       1.80  Orange
+  Center East Riser                   Riser          18.80   29.60      6       1.80  Orange
+  Center East Upper Riser             Riser          29.60   32.40      2       1.40  Orange
+  Residential Riser                   Riser          14.40   23.20      5       1.76  Orange
+  Residential Upper Riser             Riser          23.20   25.20      2       1.00  Orange
+  Residential North Lower Riser       Riser          15.20   19.60      3       1.47  Orange
+  Residential North Riser             Riser          15.20   18.00      2       1.40  Orange
+  Residential North Upper Riser       Riser          18.00   25.20      4       1.80  Orange
+  Yards Riser                         Riser          10.80   18.00      4       1.80  Orange
+  Quarter West Riser                  Riser          10.80   18.00      4       1.80  Orange
+  Quarter East Riser                  Riser          11.60   18.00      4       1.60  Orange
+  Tower Spiral                        TowerSpiral    25.20  105.00      8       9.98  Green
+
+  steps measured 267
+  Green                          0
+  Blue                           2
+  Orange                       265
+  Red                            0
+  Unreachable                    0
+
+TOWER SPIRAL
+  runs 8, 9.98 m each, pitch 20.99 deg (max 22, slope limit 50)
+  landing -> summit shared edge 4.50 m
+  summit  -> shaft  shared edge 4.50 m
+
+RELAY ACCESS (ways in off the street from which the relay is reachable)
+  Relay_CityCenter       CityCenter_B12                 32.40 m  13 routes
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_Residential      ResidentialWest_B22            25.20 m  13 routes
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_Industrial       IndustrialConstruction_B10     14.40 m  13 routes
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_Corporate        CorporateCore_B01              50.40 m  13 routes
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_OldQuarter       OldQuarter_B23                 15.20 m  13 routes
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  the summit             Tower_ShaftRoof               105.00 m  13 routes
+
+  surfaces stranded above the street: 0
+
+ROOFTOP ROUTES
+  route                            declared  hops   measured   path
+  City Center Relay via West Escape Orange       1   Blue       CityCenter_B02 -> CityCenter_B12
+  City Center Relay via East Escape Orange       1   Blue       CityCenter_B22 -> CityCenter_B12
+  City Center Relay via South Escape Orange       4   Orange     CityCenter_B10 -> CityCenter_B00 -> CityCenter_B01 -> CityCenter_B02 -> CityCenter_B12
+  Residential Relay via West Escape Orange       2   Green      ResidentialWest_B02 -> ResidentialWest_B12 -> ResidentialWest_B22
+  Residential Relay via South Escape Orange       2   Orange     ResidentialWest_B20 -> ResidentialWest_B21 -> ResidentialWest_B22
+  Residential Relay via the Ladder Orange       8   Orange     ResidentialNorth_B24 -> ResidentialNorth_B13 -> ResidentialNorth_B12 -> ResidentialNorth_B21 -> ResidentialNorth_B20 -> Deck_Residential_Ladder -> ResidentialWest_B24 -> ResidentialWest_B13 -> ResidentialWest_B22
+  Industrial Relay via the Scaffold Orange       1   Blue       IndustrialConstruction_B00 -> IndustrialConstruction_B10
+  Industrial Relay via East Escape Orange       2   Blue       IndustrialConstruction_B21 -> IndustrialConstruction_B20 -> IndustrialConstruction_B10
+  Industrial Relay via the Crane   Orange       5   Orange     IndustrialYards_B00 -> IndustrialYards_B10 -> IndustrialYards_B20 -> Deck_Yard_Crane -> IndustrialConstruction_B00 -> IndustrialConstruction_B10
+  Corporate Relay via Center East  Orange       2   Orange     CityCenter_B22 -> Deck_Center-Corporate_Span -> CorporateCore_B01
+  Corporate Relay via Center South Orange       5   Orange     CityCenter_B10 -> CityCenter_B20 -> CityCenter_B21 -> CityCenter_B22 -> Deck_Center-Corporate_Span -> CorporateCore_B01
+  Corporate Relay via Residential  Orange      11   Orange     ResidentialWest_B02 -> ResidentialWest_B11 -> ResidentialWest_B21 -> ResidentialWest_B32 -> ResidentialWest_B42 -> Deck_Center-Residential_Span -> CityCenter_B01 -> CityCenter_B02 -> CityCenter_B12 -> CityCenter_B22 -> Deck_Center-Corporate_Span -> CorporateCore_B01
+  Old Quarter Relay via West Escape Orange       2   Green      OldQuarter_B03 -> OldQuarter_B13 -> OldQuarter_B23
+  Old Quarter Relay via East Escape Orange       5   Blue       OldQuarter_B50 -> OldQuarter_B41 -> OldQuarter_B52 -> OldQuarter_B43 -> Deck_Cut_Span -> OldQuarter_B23
+  Old Quarter Relay via Residential Orange       6   Orange     ResidentialWest_B20 -> ResidentialWest_B10 -> Deck_Quarter-Residential_Span -> OldQuarter_B15 -> OldQuarter_B25 -> OldQuarter_B24 -> OldQuarter_B23
+  Tower Ascent                     Orange       1   Green      Tower_Podium -> Tower_ShaftRoof
+
+RESULT: the traversal network agrees with the movement envelope on every measure.

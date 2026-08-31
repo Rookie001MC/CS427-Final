@@ -1,0 +1,59 @@
+SKYBOUND CITY - MASSING
+
+budget (Phase 6A section 16)      actual   limit   verdict
+  GameObjects                       3559    4500   ok
+  MeshRenderers                     3465    3800   ok
+  Colliders                          450    1100   ok
+  Realtime lights                      2      10   ok
+  Renderers not static                 0       0   ok
+
+district                    n   roof min   roof max   band            coverage
+ResidentialNorth          25      14.40      25.20    14.4 -  25.2     83.0 %
+IndustrialYards            6      10.80      18.00     7.2 -  18.0     88.6 %
+IndustrialConstruction     6      14.40      16.00     7.2 -  18.0     88.6 %
+ResidentialWest           25      14.40      25.20    14.4 -  25.2     83.0 %
+CityCenter                 8      18.80      32.40    18.0 -  32.4     81.1 %
+CorporateCore              4      46.80      57.60    46.8 -  68.4     35.7 %
+OldQuarter                30      10.80      18.00    10.8 -  18.0     66.6 %
+TowerPodium              (landmark - no lot grid)
+CorporateSouth             4      39.60      61.20    39.6 -  61.2     35.7 %
+
+Skybound Tower summit: 120.0 m (design 120.0 m)
+
+Phase 6E art layer          renderers   colliders
+  DETAIL_FACADES                  1427           0
+  DETAIL_ROOFS                     510           0
+  DETAIL_SIGNS                     148           0
+  DETAIL_TRAVERSAL                 606           0
+  DETAIL_OBJECTIVES                 33           0
+  DETAIL_TOWER                      34           0
+  DETAIL_STREET                    132           0
+  TOWER_GATE_DETAIL                  8           0
+  BACKDROP                         108           0
+  total                           3006           0
+
+
+skyline looking north, west on the left (top row = 120 m):
+                               ##                             
+                               ##                             
+                              ####                            
+                              ####                            
+                              ####                            
+                              ####                            
+                              ####                            
+                              ####                            
+                              ####                            
+                              ####          #                 
+                              ####          ################  
+                              ####         #################  
+                              ####         #################  
+                              ####         #################  
+            #                 ####       ###################  
+   #### # # #  #############################################  
+   #########################################################  
+   ########################################################## 
+   ########################################################## 
+   ########################################################## 
+
+
+RESULT: massing within budget and inside every height band.

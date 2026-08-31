@@ -1,0 +1,64 @@
+SKYBOUND CITY - PHASE 6D OBJECTIVES (offline)
+Generated from CityPlan/CityObjectives/RoofGraph without opening the editor.
+The authoritative run is Tools > Skybound City > E, which also checks the scene.
+
+buildings 108  slabs 304  blocks 34  ramps 9  volumes 19  colliders 450 / 1100
+relays 5  anchors 18 (13 at the top of a way in, 5 on a relay)  problems 0
+
+THE FALL RULE
+  fatal fall              14.40 m (4 storeys)
+  safe drop (6C)          10.80 m
+  the Cut                  8.00 m  (survivable)
+  death plane            -12.00 m
+  controller backstop    -15.60 m
+  deepest fall counted as a route    10.80 m  (CityCenter_B21 -> CityCenter_B20)
+  tallest step down a stair           1.80 m  (Corporate Core North (stair))
+
+RELAYS
+  relay                  district      host                          surface  clearance  ways in
+  Relay_CityCenter       City Center   CityCenter_B12                 32.40      17.00       13
+  Relay_Residential      Residential   ResidentialWest_B22            25.20      13.39       13
+  Relay_Industrial       Industrial    IndustrialConstruction_B10     14.40      26.72       13
+  Relay_Corporate        Corporate     CorporateCore_B01              50.40      23.84       13
+  Relay_OldQuarter       Old Quarter   OldQuarter_B23                 15.20       9.64       13
+
+RESPAWN ANCHORS
+  anchor                                  kind        surface  edge margin
+  Relay_CityCenter_Anchor                  Relay        32.40       17.00
+  Relay_Residential_Anchor                 Relay        25.20       13.39
+  Relay_Industrial_Anchor                  Relay        14.40       26.72
+  Relay_Corporate_Anchor                   Relay        50.40       23.84
+  Relay_OldQuarter_Anchor                  Relay        15.20        9.64
+  Center West Escape Anchor                AscentTop    32.40        2.50
+  Center East Escape Anchor                AscentTop    32.40        2.50
+  Center South Escape Anchor               AscentTop    19.60        2.50
+  Residential West Escape Anchor           AscentTop    25.20        2.50
+  Residential South Escape Anchor          AscentTop    14.40        2.50
+  Residential North Escape Anchor          AscentTop    25.20        2.50
+  Yards West Escape Anchor                 AscentTop    11.60        2.50
+  Yards North Escape Anchor                AscentTop    18.00        2.50
+  Construction Scaffold Anchor             AscentTop    14.40        2.50
+  Construction East Escape Anchor          AscentTop    15.20        2.50
+  Quarter West Escape Anchor               AscentTop    16.00        2.50
+  Quarter East Escape Anchor               AscentTop    18.00        2.50
+  Podium East Stair Anchor                 AscentTop    25.20        2.50
+
+TOWER GATE
+  height 7.20 m against a 3.30 m mantle-assisted climb
+  side wall 10.60 m against 8.60 m of climbable run at 20.99 deg
+  foot wall 4.70 m across a 3.50 m run
+  slot to the shaft 0.50 m against a 0.70 m player
+  run 1 starts 9.98 m above the podium roof, so no later run can be stepped onto
+
+MISSION ORDERS  (the Phase 6D exit criterion)
+  from STREET                         unreachable: none
+  from CityCenter_B12                 unreachable: none
+  from ResidentialWest_B22            unreachable: none
+  from IndustrialConstruction_B10     unreachable: none
+  from CorporateCore_B01              unreachable: none
+  from OldQuarter_B23                 unreachable: none
+  from Tower_ShaftRoof                unreachable: none
+
+  orderings travellable: 120 / 120
+
+RESULT: the mission is completable, in every order the relays can be taken in.

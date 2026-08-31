@@ -178,11 +178,23 @@ public sealed class GameManagerRecoveryTests
         };
     }
 
+    /// <summary>
+    /// Waits for a run state, bounded by the wall clock rather than by a frame count.
+    ///
+    /// A frame budget is the wrong unit here. The countdown this waits on is measured in seconds
+    /// (WaitForSeconds), while play-mode test frames are driven as fast as the editor can tick
+    /// them - the test runner explicitly removes the editor's frame throttle for a run. 180
+    /// frames of an empty scene can therefore expire in well under the 0.3s countdown step
+    /// RetryAfterNoCheckpointDeath configures, which is exactly how that test failed: it timed
+    /// out in Countdown and never reached the death it was about to trigger. The two tests using
+    /// a 0.01s step were fast enough to beat the budget and passed on the same code.
+    /// </summary>
     private static IEnumerator WaitForState(GameManager game, RunState expected)
     {
-        const int maxFrames = 180;
+        const float timeoutSeconds = 10f;
+        float deadline = Time.realtimeSinceStartup + timeoutSeconds;
 
-        for (int frame = 0; frame < maxFrames && game.State != expected; frame++)
+        while (game.State != expected && Time.realtimeSinceStartup < deadline)
         {
             yield return null;
         }

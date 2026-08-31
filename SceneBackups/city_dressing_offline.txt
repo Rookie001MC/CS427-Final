@@ -1,0 +1,405 @@
+=== SkyboundCityTests: 114 passed, 0 failed, 1 needs-Unity (Chevron_TheApexArithmeticAgreesWithLookRotation) ===
+
+=== PHASE 6E DRESSING ===
+detail pieces        3006
+plan detail list     3006
+colliders (unchanged) 450
+dressed roofs        54
+bare roofs           54
+props rejected       64
+problems             0
+
+group                       pieces
+  DETAIL_FACADES               1427
+  DETAIL_TRAVERSAL              606
+  DETAIL_ROOFS                  510
+  DETAIL_SIGNS                  148
+  DETAIL_STREET                 132
+  BACKDROP                      108
+  DETAIL_TOWER                   34
+  DETAIL_OBJECTIVES              33
+  TOWER_GATE_DETAIL               8
+
+massing renderers    455
+scaffold uprights    4
+detail renderers     3006
+projected total      3465  (budget 3800)
+
+=== INVARIANTS ===
+details are never collidable: 3006 pieces, 0 colliders by type
+highest non-backdrop detail: Tower_Beacon at 120.00 m (tower top 120.0 m)
+backdrop outer reach: 809 m (far clip 1200 m, fog end 700 m)
+dressing deterministic: True
+
+=== ROUTE GUIDANCE ===
+nodes 294  (street 140, feet 13, surfaces 128)
+links 949
+targets 6
+problems 0
+
+spawn snaps to NAV_S-19_-23 (Street) at (-19.40, 0.00, -23.25)
+
+target                        nodes  legs   route m  direct m  ratio  tier   crumbs
+  Relay_CityCenter               13    11       285        90   3.16  Orange    26
+  Relay_Residential              14    12       372       201   1.85  Orange    24
+  Relay_Industrial               15    13       391       267   1.46  Orange    26
+  Relay_Corporate                15    13       323       169   1.91  Orange    26
+  Relay_OldQuarter               19    17       540       269   2.01  Orange    24
+  Skybound Tower                 13    11       332       198   1.68  Orange    26
+
+street legs checked 59, through a wall 0
+way-in x target pairs unreachable: 0
+nav graph deterministic: True
+
+=== FLICKER PROBE ===
+node x target pairs with NO route: 0 of 1764
+nodes that cannot reach at least one target: 0 of 294
+
+nearest-node stability, walking a 1 m grid across each relay roof:
+  roof                         samples  node flips  route-shape changes
+  CityCenter_B12                  2418           0                    0
+  ResidentialWest_B22             1054           0                    0
+  IndustrialConstruction_B10      4988           0                    0
+  CorporateCore_B01               3120           0                    0
+  OldQuarter_B23                   624           0                    0
+
+contested snaps (a second node within 2 m of the winner's score):
+  42 of 3075 rooftop samples have a rival within 2 m of the winner
+
+near-cull radius in ShowMarkers: 2.83 m (no hysteresis - a player hovering at this radius shifts the whole trail one step per frame)
+
+objective chatter: samples where two uncaptured relays are within 3 m of equidistant
+  113 of 5041 street samples sit on a knife edge between two relays
+
+=== ROUTE GUIDE FRAME PROBE ===
+  Relay_CityCenter follow-route 6m/s: frames=2651 searches=1 rebuilds=845 toggles=78 jumps=585(max 7.83m) shownChanges=41 alongJumps=0(max 0.0m) actionToggles=4
+  Relay_CityCenter sprint 10m/s: frames=1590 searches=1 rebuilds=508 toggles=78 jumps=585(max 7.83m) shownChanges=41 alongJumps=0(max 0.0m) actionToggles=4
+  Relay_CityCenter slow 1.5m/s: frames=4800 searches=1 rebuilds=2 toggles=56 jumps=383(max 7.83m) shownChanges=19 alongJumps=0(max 0.0m) actionToggles=2
+  Relay_Corporate follow-route 6m/s: frames=3033 searches=1 rebuilds=806 toggles=92 jumps=666(max 7.24m) shownChanges=48 alongJumps=0(max 0.0m) actionToggles=6
+  Relay_Corporate sprint 10m/s: frames=1819 searches=1 rebuilds=485 toggles=92 jumps=666(max 7.24m) shownChanges=48 alongJumps=0(max 0.0m) actionToggles=6
+  Relay_Corporate slow 1.5m/s: frames=4800 searches=1 rebuilds=2 toggles=56 jumps=344(max 7.24m) shownChanges=19 alongJumps=0(max 0.0m) actionToggles=2
+  Relay_Industrial follow-route 6m/s: frames=3712 searches=1 rebuilds=787 toggles=112 jumps=849(max 7.00m) shownChanges=59 alongJumps=0(max 0.0m) actionToggles=4
+  Relay_Industrial sprint 10m/s: frames=2226 searches=1 rebuilds=473 toggles=112 jumps=849(max 7.00m) shownChanges=59 alongJumps=0(max 0.0m) actionToggles=4
+  Relay_Industrial slow 1.5m/s: frames=4800 searches=1 rebuilds=2 toggles=55 jumps=339(max 7.00m) shownChanges=19 alongJumps=0(max 0.0m) actionToggles=0
+  Relay_OldQuarter follow-route 6m/s: frames=5204 searches=1 rebuilds=811 toggles=158 jumps=1290(max 8.32m) shownChanges=84 alongJumps=0(max 0.0m) actionToggles=6
+  Relay_OldQuarter sprint 10m/s: frames=3121 searches=1 rebuilds=489 toggles=158 jumps=1290(max 8.32m) shownChanges=84 alongJumps=0(max 0.0m) actionToggles=6
+  Relay_OldQuarter slow 1.5m/s: frames=4800 searches=1 rebuilds=2 toggles=57 jumps=364(max 7.00m) shownChanges=20 alongJumps=0(max 0.0m) actionToggles=0
+  Relay_Residential follow-route 6m/s: frames=3523 searches=1 rebuilds=808 toggles=108 jumps=823(max 8.34m) shownChanges=57 alongJumps=0(max 0.0m) actionToggles=6
+  Relay_Residential sprint 10m/s: frames=2113 searches=1 rebuilds=486 toggles=108 jumps=823(max 8.34m) shownChanges=57 alongJumps=0(max 0.0m) actionToggles=6
+  Relay_Residential slow 1.5m/s: frames=4800 searches=1 rebuilds=2 toggles=57 jumps=364(max 7.00m) shownChanges=20 alongJumps=0(max 0.0m) actionToggles=0
+  Skybound Tower follow-route 6m/s: frames=3124 searches=1 rebuilds=828 toggles=94 jumps=691(max 8.69m) shownChanges=49 alongJumps=0(max 0.0m) actionToggles=8
+  Skybound Tower sprint 10m/s: frames=1874 searches=1 rebuilds=498 toggles=94 jumps=691(max 8.69m) shownChanges=49 alongJumps=0(max 0.0m) actionToggles=8
+  Skybound Tower slow 1.5m/s: frames=4800 searches=1 rebuilds=2 toggles=58 jumps=369(max 8.69m) shownChanges=20 alongJumps=0(max 0.0m) actionToggles=4
+
+-- standing still, 600 frames --
+  STILL CityCenter_B12 -> Relay_Corporate: searches=600 rebuilds=600 toggles=20 jumps=0(max 0.00m) shownChanges=0 actionToggles=2
+  STILL CityCenter_B12 -> Relay_Industrial: searches=600 rebuilds=600 toggles=25 jumps=0(max 0.00m) shownChanges=0 actionToggles=1
+  STILL CityCenter_B12 -> Relay_OldQuarter: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL CityCenter_B12 -> Relay_Residential: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL CityCenter_B12 -> Skybound Tower: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL ResidentialWest_B22 -> Relay_CityCenter: searches=600 rebuilds=600 toggles=25 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL ResidentialWest_B22 -> Relay_Corporate: searches=600 rebuilds=600 toggles=25 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL ResidentialWest_B22 -> Relay_Industrial: searches=600 rebuilds=600 toggles=24 jumps=0(max 0.00m) shownChanges=0 actionToggles=3
+  STILL ResidentialWest_B22 -> Relay_OldQuarter: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL ResidentialWest_B22 -> Skybound Tower: searches=600 rebuilds=600 toggles=25 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL IndustrialConstruction_B10 -> Relay_CityCenter: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=2
+  STILL IndustrialConstruction_B10 -> Relay_Corporate: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=2
+  STILL IndustrialConstruction_B10 -> Relay_OldQuarter: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=2
+  STILL IndustrialConstruction_B10 -> Relay_Residential: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=2
+  STILL IndustrialConstruction_B10 -> Skybound Tower: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=2
+  STILL CorporateCore_B01 -> Relay_CityCenter: searches=600 rebuilds=600 toggles=22 jumps=0(max 0.00m) shownChanges=0 actionToggles=3
+  STILL CorporateCore_B01 -> Relay_Industrial: searches=600 rebuilds=600 toggles=25 jumps=0(max 0.00m) shownChanges=0 actionToggles=3
+  STILL CorporateCore_B01 -> Relay_OldQuarter: searches=600 rebuilds=600 toggles=25 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL CorporateCore_B01 -> Relay_Residential: searches=600 rebuilds=600 toggles=24 jumps=0(max 0.00m) shownChanges=0 actionToggles=3
+  STILL CorporateCore_B01 -> Skybound Tower: searches=600 rebuilds=600 toggles=25 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL OldQuarter_B23 -> Relay_CityCenter: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=3
+  STILL OldQuarter_B23 -> Relay_Corporate: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL OldQuarter_B23 -> Relay_Industrial: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL OldQuarter_B23 -> Relay_Residential: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  STILL OldQuarter_B23 -> Skybound Tower: searches=600 rebuilds=600 toggles=26 jumps=0(max 0.00m) shownChanges=0 actionToggles=4
+  (nothing above means standing still is clean)
+
+-- rooftop wander (a 20 m circle near the roof edge), 900 frames --
+  WANDER CityCenter_B12 -> Relay_Corporate: searches=771 rebuilds=771 toggles=29 jumps=189(max 8.87m) shownChanges=9 alongJumps=0(max 0.0m) actionToggles=5
+  WANDER CityCenter_B12 -> Relay_Industrial: searches=771 rebuilds=771 toggles=40 jumps=225(max 7.00m) shownChanges=15 alongJumps=0(max 0.0m) actionToggles=4
+  WANDER CityCenter_B12 -> Relay_OldQuarter: searches=725 rebuilds=725 toggles=50 jumps=348(max 15.87m) shownChanges=24 alongJumps=2(max 1.1m) actionToggles=4
+  WANDER CityCenter_B12 -> Relay_Residential: searches=725 rebuilds=725 toggles=50 jumps=348(max 15.87m) shownChanges=24 alongJumps=2(max 1.1m) actionToggles=4
+  WANDER CityCenter_B12 -> Skybound Tower: searches=725 rebuilds=725 toggles=50 jumps=348(max 16.12m) shownChanges=24 alongJumps=2(max 1.1m) actionToggles=8
+  WANDER ResidentialWest_B22 -> Relay_CityCenter: searches=734 rebuilds=734 toggles=36 jumps=198(max 16.10m) shownChanges=11 alongJumps=0(max 0.0m) actionToggles=4
+  WANDER ResidentialWest_B22 -> Relay_Corporate: searches=734 rebuilds=734 toggles=36 jumps=198(max 16.10m) shownChanges=11 alongJumps=0(max 0.0m) actionToggles=4
+  WANDER ResidentialWest_B22 -> Relay_Industrial: searches=749 rebuilds=749 toggles=33 jumps=138(max 8.46m) shownChanges=9 alongJumps=0(max 0.0m) actionToggles=6
+  WANDER ResidentialWest_B22 -> Relay_OldQuarter: searches=680 rebuilds=680 toggles=26 jumps=156(max 9.18m) shownChanges=0 alongJumps=0(max 0.0m) actionToggles=4
+  WANDER ResidentialWest_B22 -> Skybound Tower: searches=734 rebuilds=734 toggles=36 jumps=198(max 16.10m) shownChanges=11 alongJumps=0(max 0.0m) actionToggles=4
+  WANDER IndustrialConstruction_B10 -> Relay_CityCenter: searches=790 rebuilds=790 toggles=40 jumps=383(max 9.18m) shownChanges=14 alongJumps=2(max 1.3m) actionToggles=10
+  WANDER IndustrialConstruction_B10 -> Relay_Corporate: searches=790 rebuilds=790 toggles=40 jumps=383(max 9.18m) shownChanges=14 alongJumps=2(max 1.3m) actionToggles=10
+  WANDER IndustrialConstruction_B10 -> Relay_OldQuarter: searches=790 rebuilds=790 toggles=56 jumps=375(max 9.18m) shownChanges=30 alongJumps=2(max 1.3m) actionToggles=6
+  WANDER IndustrialConstruction_B10 -> Relay_Residential: searches=790 rebuilds=790 toggles=40 jumps=383(max 9.18m) shownChanges=14 alongJumps=2(max 1.3m) actionToggles=10
+  WANDER IndustrialConstruction_B10 -> Skybound Tower: searches=790 rebuilds=790 toggles=56 jumps=375(max 9.18m) shownChanges=30 alongJumps=2(max 1.3m) actionToggles=6
+  WANDER CorporateCore_B01 -> Relay_CityCenter: searches=777 rebuilds=777 toggles=38 jumps=312(max 8.27m) shownChanges=16 alongJumps=0(max 0.0m) actionToggles=7
+  WANDER CorporateCore_B01 -> Relay_Industrial: searches=777 rebuilds=777 toggles=53 jumps=388(max 8.34m) shownChanges=28 alongJumps=0(max 0.0m) actionToggles=11
+  WANDER CorporateCore_B01 -> Relay_OldQuarter: searches=777 rebuilds=777 toggles=53 jumps=384(max 8.27m) shownChanges=28 alongJumps=0(max 0.0m) actionToggles=8
+  WANDER CorporateCore_B01 -> Relay_Residential: searches=777 rebuilds=777 toggles=52 jumps=372(max 9.21m) shownChanges=28 alongJumps=0(max 0.0m) actionToggles=11
+  WANDER CorporateCore_B01 -> Skybound Tower: searches=777 rebuilds=777 toggles=53 jumps=384(max 8.27m) shownChanges=28 alongJumps=0(max 0.0m) actionToggles=8
+  WANDER OldQuarter_B23 -> Relay_CityCenter: searches=568 rebuilds=568 toggles=26 jumps=208(max 7.38m) shownChanges=0 alongJumps=0(max 0.0m) actionToggles=7
+  WANDER OldQuarter_B23 -> Relay_Corporate: searches=652 rebuilds=652 toggles=26 jumps=156(max 8.24m) shownChanges=0 alongJumps=0(max 0.0m) actionToggles=4
+  WANDER OldQuarter_B23 -> Relay_Industrial: searches=652 rebuilds=652 toggles=26 jumps=156(max 8.24m) shownChanges=0 alongJumps=0(max 0.0m) actionToggles=4
+  WANDER OldQuarter_B23 -> Relay_Residential: searches=568 rebuilds=568 toggles=30 jumps=256(max 15.41m) shownChanges=4 alongJumps=2(max 2.6m) actionToggles=4
+  WANDER OldQuarter_B23 -> Skybound Tower: searches=652 rebuilds=652 toggles=26 jumps=156(max 8.24m) shownChanges=0 alongJumps=0(max 0.0m) actionToggles=4
+
+=== WHY IT RE-SEARCHES: distance from the player to the route ===
+  CityCenter_B12: node extent 20.0 x 31.8 m, worst distance-to-route from a standing spot = 36.1 m (threshold 9 m => RE-SEARCHES EVERY FRAME)
+  ResidentialWest_B22: node extent 17.8 x 16.4 m, worst distance-to-route from a standing spot = 22.8 m (threshold 9 m => RE-SEARCHES EVERY FRAME)
+  IndustrialConstruction_B10: node extent 29.7 x 44.0 m, worst distance-to-route from a standing spot = 50.9 m (threshold 9 m => RE-SEARCHES EVERY FRAME)
+  CorporateCore_B01: node extent 26.8 x 30.8 m, worst distance-to-route from a standing spot = 38.4 m (threshold 9 m => RE-SEARCHES EVERY FRAME)
+  OldQuarter_B23: node extent 12.6 x 13.9 m, worst distance-to-route from a standing spot = 17.4 m (threshold 9 m => RE-SEARCHES EVERY FRAME)
+
+=== DEGENERATE CHEVRON HEADINGS AND OVERLAPPING MARKERS ===
+  798 chevrons over every (start, objective) pair:
+    0 with no horizontal heading at all (they inherit whichever pool slot's old rotation)
+    0 sitting within 1.5 m of the one before (closest 2.31 m) - coplanar, so they z-fight
+
+=== ROUTE GUIDE, AFTER THE FIX (the real RouteTrail) ===
+
+-- standing still on a rooftop, 600 frames --
+  worst over every roof/objective pair: searches=1 toggles=0 (was 600 searches in 600 frames)
+
+-- rooftop wander, a circle to the roof edge, 900 frames --
+  worst: searches=1 toggles=5 (was 568-790 searches in 900 frames)
+
+-- running the route: slow 1.5 m/s, run 6 m/s, sprint 10 m/s --
+  Relay_CityCenter at 1.5 m/s: frames=10608 searches=1 lays=3 toggles=55 appeared=10 vanished=40
+  Relay_CityCenter at 6.0 m/s: frames=2652 searches=1 lays=3 toggles=55 appeared=10 vanished=40
+  Relay_CityCenter at 10.0 m/s: frames=1591 searches=1 lays=3 toggles=55 appeared=10 vanished=40
+  Relay_Corporate at 1.5 m/s: frames=12134 searches=1 lays=3 toggles=73 appeared=17 vanished=46
+  Relay_Corporate at 6.0 m/s: frames=3033 searches=1 lays=3 toggles=73 appeared=17 vanished=46
+  Relay_Corporate at 10.0 m/s: frames=1820 searches=1 lays=3 toggles=73 appeared=17 vanished=46
+  Relay_Industrial at 1.5 m/s: frames=14851 searches=1 lays=4 toggles=91 appeared=25 vanished=56
+  Relay_Industrial at 6.0 m/s: frames=3713 searches=1 lays=4 toggles=91 appeared=25 vanished=56
+  Relay_Industrial at 10.0 m/s: frames=2227 searches=1 lays=4 toggles=91 appeared=25 vanished=56
+  Relay_OldQuarter at 1.5 m/s: frames=20821 searches=1 lays=6 toggles=138 appeared=43 vanished=79
+  Relay_OldQuarter at 6.0 m/s: frames=5205 searches=1 lays=6 toggles=138 appeared=43 vanished=79
+  Relay_OldQuarter at 10.0 m/s: frames=3123 searches=1 lays=6 toggles=138 appeared=43 vanished=79
+  Relay_Residential at 1.5 m/s: frames=14095 searches=1 lays=4 toggles=88 appeared=22 vanished=54
+  Relay_Residential at 6.0 m/s: frames=3524 searches=1 lays=4 toggles=88 appeared=22 vanished=54
+  Relay_Residential at 10.0 m/s: frames=2114 searches=1 lays=4 toggles=88 appeared=22 vanished=54
+  Skybound Tower at 1.5 m/s: frames=12502 searches=1 lays=3 toggles=73 appeared=17 vanished=47
+  Skybound Tower at 6.0 m/s: frames=3125 searches=1 lays=3 toggles=73 appeared=17 vanished=47
+  Skybound Tower at 10.0 m/s: frames=1875 searches=1 lays=3 toggles=73 appeared=17 vanished=47
+
+-- overlapping markers, after the collision rule --
+  798 chevrons, 0 closer than the 2.30 m clear gap, closest 2.31 m (was 47 overlaps, closest 0.22 m)
+
+-- the chevron's visible arrow direction --
+  a chevron's arms meet at local +Z; RouteGuide aims local +Z along Breadcrumb.Forward, which is (this route point -> the next one).
+
+=== CHEVRON GEOMETRY (local space, +Z is the direction of travel) ===
+  marker size 1.15 m, arms yawed 38 deg
+  left  arm: centre z=+0.18  yaw=+38  tip=(+0.04, +0.61)  tail=(-0.64, -0.25)
+  right arm: centre z=+0.18  yaw=-38  tip=(-0.04, +0.61)  tail=(+0.64, -0.25)
+  arms meet 0.07 m apart at z=+0.61 and open to 1.27 m at z=-0.25
+  => the point of the arrow is at +Z, the FRONT
+  (before: arms met 0.07 m apart at z=-0.61 and opened to 1.27 m at z=+0.25 => the point was at -Z, exactly 180 degrees backwards)
+
+=== STANDING ON THE OBJECTIVE, 600 frames ===
+  Relay_CityCenter: searches=1 lays=1 crumbs=0 routeLen=0.0 along=0.0
+  Relay_Corporate: searches=1 lays=1 crumbs=0 routeLen=0.0 along=0.0
+  Relay_Industrial: searches=1 lays=1 crumbs=0 routeLen=0.0 along=0.0
+  Relay_OldQuarter: searches=1 lays=1 crumbs=0 routeLen=0.0 along=0.0
+  Relay_Residential: searches=1 lays=1 crumbs=0 routeLen=0.0 along=0.0
+  Skybound Tower: searches=1 lays=1 crumbs=0 routeLen=0.0 along=0.0
+
+=== STABILITY AFTER THE FIX ===
+
+nearest node over a 1 m rooftop grid, with a CharacterController's idle y jitter:
+  roof                          samples  bare flips  stable flips
+  CityCenter_B12                   7254           0             0
+  ResidentialWest_B22              3162           0             0
+  IndustrialConstruction_B10      14964           0             0
+  CorporateCore_B01                9360           0             0
+  OldQuarter_B23                   1872           0             0
+
+objective switches along a 560 m walk across the city, sampled every 0.5 m:
+  without stickiness: 63 switches   with: 0
+
+trail anchoring: the same route searched from 40 positions on one roof
+  chevron positions that moved between identical searches: 0
+  arc position monotonic while running the route: True (0 reversals)
+  arc position changes over 120 stationary frames: 0
+
+=== NEXT-OBJECTIVE MATRIX ===
+  after capturing        the compass then points at        distance
+  Relay_CityCenter       Relay_Corporate                   148 m
+  Relay_Residential      Relay_OldQuarter                  190 m
+  Relay_Industrial       Relay_Corporate                   121 m
+  Relay_Corporate        Relay_Industrial                  121 m
+  Relay_OldQuarter       Relay_Residential                 190 m
+
+=== ROUTE TO THE INDUSTRIAL RELAY, FROM EVERY OTHER RELAY ===
+
+--- from Relay_CityCenter (City Center) ---
+START: the 32.4 m roof of the City Center lot [1,2] (9 storeys, at x 0, z 58)
+  JUMP   east across a 6.5 m gap (0.0 m, Blue) -> the 32.4 m roof of the City Center lot [2,2] (9 storeys, at x 58, z 58)
+  DOWN   the Center East Escape (fire escape, 18 mantles of 1.8 m) (-32.4 m) -> the pavement at the foot of Center East Escape
+  RUN    5 m east -> street level at (97, 60)
+  RUN    37 m north -> street level at (97, 97)
+  RUN    21 m north -> street level at (97, 118)
+  RUN    5 m east -> the pavement at the foot of Construction Scaffold
+  CLIMB  the Construction Scaffold (scaffold, 8 mantles of 1.8 m) on the north-east side (+14.4 m) -> the 14.4 m roof of the Industrial Construction site lot [0,0] (4 storeys, at x 135, z 148)
+  JUMP   east across a 7.0 m gap (0.0 m, Blue) -> the 14.4 m roof of the Industrial Construction site lot [1,0] (4 storeys, at x 202, z 148)
+  ARRIVE Industrial relay pad
+  hardest move: Orange
+
+--- from Relay_Residential (Residential) ---
+START: the 25.2 m roof of Residential West lot [2,2] (7 storeys, at x -198, z 0)
+  JUMP   south across a 4.0 m gap (-2.0 m, Green) -> the 23.2 m roof of Residential West lot [2,1] (6 storeys, at x -198, z -34)
+  JUMP   south across a 4.0 m gap (-8.8 m, Green) -> the 14.4 m roof of Residential West lot [2,0] (4 storeys, at x -198, z -71)
+  DOWN   the Residential South Escape (fire escape, 8 mantles of 1.8 m) (-14.4 m) -> the pavement at the foot of Residential South Escape
+  RUN    5 m south -> street level at (-197, -97)
+  RUN    21 m east -> street level at (-175, -97)
+  RUN    39 m east -> street level at (-136, -97)
+  RUN    39 m east -> street level at (-97, -97)
+  RUN    39 m east -> street level at (-58, -97)
+  RUN    35 m east -> street level at (-23, -97)
+  RUN    4 m east -> street level at (-19, -97)
+  RUN    39 m east -> street level at (19, -97)
+  RUN    4 m east -> street level at (23, -97)
+  RUN    39 m north -> street level at (23, -58)
+  RUN    35 m north -> street level at (23, -23)
+  RUN    4 m north -> street level at (23, -19)
+  RUN    39 m north -> street level at (23, 19)
+  RUN    4 m north -> street level at (23, 23)
+  RUN    35 m east -> street level at (58, 23)
+  RUN    39 m east -> street level at (97, 23)
+  RUN    35 m north -> street level at (97, 58)
+  RUN    39 m north -> street level at (97, 97)
+  RUN    21 m north -> street level at (97, 118)
+  RUN    5 m east -> the pavement at the foot of Construction Scaffold
+  CLIMB  the Construction Scaffold (scaffold, 8 mantles of 1.8 m) on the north-east side (+14.4 m) -> the 14.4 m roof of the Industrial Construction site lot [0,0] (4 storeys, at x 135, z 148)
+  JUMP   east across a 7.0 m gap (0.0 m, Blue) -> the 14.4 m roof of the Industrial Construction site lot [1,0] (4 storeys, at x 202, z 148)
+  ARRIVE Industrial relay pad
+  hardest move: Orange
+
+--- from Relay_Corporate (Corporate) ---
+START: the 50.4 m roof of the Corporate Core lot [0,1] (14 storeys, at x 147, z 40)
+  DOWN   the Center-Corporate Span (stair) (link stair, 10 mantles of 1.8 m) (-18.0 m) -> the Center-Corporate Span deck at 32 m
+  CROSS  Center-Corporate Span - a 3.2 m skybridge at 32 m - heading west (48 m, 0.0 m) -> the 32.4 m roof of the City Center lot [2,2] (9 storeys, at x 58, z 58)
+  DOWN   the Center East Escape (fire escape, 18 mantles of 1.8 m) (-32.4 m) -> the pavement at the foot of Center East Escape
+  RUN    5 m east -> street level at (97, 60)
+  RUN    37 m north -> street level at (97, 97)
+  RUN    21 m north -> street level at (97, 118)
+  RUN    5 m east -> the pavement at the foot of Construction Scaffold
+  CLIMB  the Construction Scaffold (scaffold, 8 mantles of 1.8 m) on the north-east side (+14.4 m) -> the 14.4 m roof of the Industrial Construction site lot [0,0] (4 storeys, at x 135, z 148)
+  JUMP   east across a 7.0 m gap (0.0 m, Blue) -> the 14.4 m roof of the Industrial Construction site lot [1,0] (4 storeys, at x 202, z 148)
+  ARRIVE Industrial relay pad
+  hardest move: Orange
+
+--- from Relay_OldQuarter (Old Quarter) ---
+START: the 15.2 m roof of the Old Quarter lot [2,3] (4 storeys, at x -213, z -189)
+  CROSS  Cut Span - a 3.2 m skybridge at 15 m - heading east (31 m, 0.0 m) -> the Cut Span deck at 15 m
+  CLIMB  the Cut Span (stair) (link stair, 1 mantles of 0.8 m) on the east side (+0.8 m) -> the 16.0 m roof of the Old Quarter lot [4,3] (4 storeys, at x -150, z -189)
+  JUMP   east across a 3.5 m gap (0.0 m, Green) -> the 16.0 m roof of the Old Quarter lot [5,3] (4 storeys, at x -118, z -189)
+  CROSS  Quarter-Tower Span - a 3.2 m skybridge at 16 m - heading east (21 m, 0.0 m) -> the Quarter-Tower Span deck at 16 m
+  CLIMB  the Quarter-Tower Span (stair) (link stair, 6 mantles of 1.5 m) on the east side (+9.2 m) -> the tower's west podium wing
+  JUMP   east across a 0.0 m gap (0.0 m, Green) -> the tower podium roof at 25.2 m
+  DOWN   the Podium East Stair (fire escape, 14 mantles of 1.8 m) (-25.2 m) -> the pavement at the foot of Podium East Stair
+  RUN    50 m east -> street level at (97, -193)
+  RUN    17 m north -> street level at (97, -175)
+  RUN    39 m north -> street level at (97, -136)
+  RUN    39 m north -> street level at (97, -97)
+  RUN    39 m north -> street level at (97, -58)
+  RUN    35 m north -> street level at (97, -23)
+  RUN    4 m north -> street level at (97, -19)
+  RUN    39 m north -> street level at (97, 19)
+  RUN    4 m north -> street level at (97, 23)
+  RUN    35 m north -> street level at (97, 58)
+  RUN    39 m north -> street level at (97, 97)
+  RUN    21 m north -> street level at (97, 118)
+  RUN    5 m east -> the pavement at the foot of Construction Scaffold
+  CLIMB  the Construction Scaffold (scaffold, 8 mantles of 1.8 m) on the north-east side (+14.4 m) -> the 14.4 m roof of the Industrial Construction site lot [0,0] (4 storeys, at x 135, z 148)
+  JUMP   east across a 7.0 m gap (0.0 m, Blue) -> the 14.4 m roof of the Industrial Construction site lot [1,0] (4 storeys, at x 202, z 148)
+  ARRIVE Industrial relay pad
+  hardest move: Orange
+
+=== RELAY 1 -> INDUSTRIAL RELAY ===
+first objective from the spawn: Relay_CityCenter (City Center)
+next objective from there:      Relay_Corporate (Corporate)
+
+START: the 32.4 m roof of the City Center lot [1,2] (9 storeys, at x 0, z 58)
+  JUMP   east across a 6.5 m gap (0.0 m, Blue) -> the 32.4 m roof of the City Center lot [2,2] (9 storeys, at x 58, z 58)
+  CROSS  Center-Corporate Span - a 3.2 m skybridge at 32 m - heading east (48 m, 0.0 m) -> the Center-Corporate Span deck at 32 m
+  CLIMB  the Center-Corporate Span (stair) (link stair, 10 mantles of 1.8 m) on the east side (+18.0 m) -> the 50.4 m roof of the Corporate Core lot [0,1] (14 storeys, at x 147, z 40)
+  ARRIVE Corporate relay pad
+
+  hardest move on the route: Orange
+
+  move-by-move check against the movement envelope:
+    jump 6.50 m, rise 0.00 m, landing 63.5 m -> Blue, sprint design gap 9.24 m  ok
+  jumps outside the envelope: 0
+
+=== POLYLINE ===
+  [0] (0.00, 32.40, 58.25)  move=Walk
+  [1] (18.50, 32.40, 58.25)  move=Jump
+  [2] (88.50, 32.40, 59.61)  move=Descend
+  [3] (92.40, 0.00, 59.61)  move=Walk
+  [4] (97.00, 0.00, 59.61)  move=Walk
+  [5] (97.00, 0.00, 97.00)  move=Walk
+  [6] (97.00, 0.00, 118.20)  move=Walk
+  [7] (101.61, 0.00, 118.20)  move=Climb
+  [8] (163.90, 14.40, 147.97)  move=Jump
+  [9] (202.13, 14.40, 147.97)  move=Walk
+
+=== CRUMBS from 0 (26) ===
+  along    7.00  (7.00, 32.40, 58.25)  Jump  transition=False
+  along   14.00  (14.00, 32.40, 58.25)  Jump  transition=False
+  along   18.50  (18.50, 32.40, 58.25)  Jump  transition=True
+  along   21.00  (21.00, 32.40, 58.30)  Descend  transition=False
+  along   28.00  (28.00, 32.40, 58.44)  Descend  transition=False
+  along   35.00  (35.00, 32.40, 58.57)  Descend  transition=False
+  along   42.00  (42.00, 32.40, 58.71)  Descend  transition=False
+  along   49.00  (48.99, 32.40, 58.84)  Descend  transition=False
+  along   56.00  (55.99, 32.40, 58.98)  Descend  transition=False
+  along   63.00  (62.99, 32.40, 59.12)  Descend  transition=False
+  along   70.00  (69.99, 32.40, 59.25)  Descend  transition=False
+  along   77.00  (76.99, 32.40, 59.39)  Descend  transition=False
+  along   84.00  (83.99, 32.40, 59.53)  Descend  transition=False
+  along   88.51  (88.50, 32.40, 59.61)  Descend  transition=True
+  along   91.00  (88.80, 29.93, 59.61)  Walk  transition=False
+  along   98.00  (89.63, 22.98, 59.61)  Walk  transition=False
+  along  105.00  (90.47, 16.03, 59.61)  Walk  transition=False
+  along  112.00  (91.31, 9.08, 59.61)  Walk  transition=False
+  along  119.00  (92.14, 2.13, 59.61)  Walk  transition=False
+  along  126.00  (97.00, 0.00, 59.87)  Walk  transition=False
+  along  133.00  (97.00, 0.00, 66.87)  Walk  transition=False
+  along  140.00  (97.00, 0.00, 73.87)  Walk  transition=False
+  along  147.00  (97.00, 0.00, 80.87)  Walk  transition=False
+  along  154.00  (97.00, 0.00, 87.87)  Walk  transition=False
+  along  161.00  (97.00, 0.00, 94.87)  Walk  transition=False
+  along  168.00  (97.00, 0.00, 101.87)  Walk  transition=False
+
+=== CRUMBS from 19 (26) ===
+  along   21.00  (21.00, 32.40, 58.30)  Descend  transition=False
+  along   28.00  (28.00, 32.40, 58.44)  Descend  transition=False
+  along   35.00  (35.00, 32.40, 58.57)  Descend  transition=False
+  along   42.00  (42.00, 32.40, 58.71)  Descend  transition=False
+  along   49.00  (48.99, 32.40, 58.84)  Descend  transition=False
+  along   56.00  (55.99, 32.40, 58.98)  Descend  transition=False
+  along   63.00  (62.99, 32.40, 59.12)  Descend  transition=False
+  along   70.00  (69.99, 32.40, 59.25)  Descend  transition=False
+  along   77.00  (76.99, 32.40, 59.39)  Descend  transition=False
+  along   84.00  (83.99, 32.40, 59.53)  Descend  transition=False
+  along   88.51  (88.50, 32.40, 59.61)  Descend  transition=True
+  along   91.00  (88.80, 29.93, 59.61)  Walk  transition=False
+  along   98.00  (89.63, 22.98, 59.61)  Walk  transition=False
+  along  105.00  (90.47, 16.03, 59.61)  Walk  transition=False
+  along  112.00  (91.31, 9.08, 59.61)  Walk  transition=False
+  along  119.00  (92.14, 2.13, 59.61)  Walk  transition=False
+  along  126.00  (97.00, 0.00, 59.87)  Walk  transition=False
+  along  133.00  (97.00, 0.00, 66.87)  Walk  transition=False
+  along  140.00  (97.00, 0.00, 73.87)  Walk  transition=False
+  along  147.00  (97.00, 0.00, 80.87)  Walk  transition=False
+  along  154.00  (97.00, 0.00, 87.87)  Walk  transition=False
+  along  161.00  (97.00, 0.00, 94.87)  Walk  transition=False
+  along  168.00  (97.00, 0.00, 101.87)  Walk  transition=False
+  along  175.00  (97.00, 0.00, 108.87)  Walk  transition=False
+  along  182.00  (97.00, 0.00, 115.87)  Walk  transition=False
+  along  188.95  (101.61, 0.00, 118.20)  Climb  transition=True

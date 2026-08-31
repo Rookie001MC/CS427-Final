@@ -32,15 +32,14 @@ public sealed class MenuButtonVisual : MonoBehaviour,
     [Tooltip("Accent used by Primary fill and by the hover edge of Outline/Ghost.")]
     [SerializeField] private Color accent = UITheme.Cyan;
 
-    [SerializeField] private float hoverScale = 1.015f;
-
-    private RectTransform rect;
     private Color fillIdle, fillHover, textIdle, textHover, borderIdle, borderHover;
     private bool hovered, pressed;
 
     private void Awake()
     {
-        rect = (RectTransform)transform;
+        // Any localScale left over from an older build would resample this button's TMP label
+        // instead of re-rendering it, which is exactly the softness this pass removes.
+        transform.localScale = Vector3.one;
         BuildPalette();
         Apply(1f, true);
     }
@@ -107,12 +106,16 @@ public sealed class MenuButtonVisual : MonoBehaviour,
     {
         bool live = Interactive;
         float targetBlend = hovered && live ? 1f : 0f;
-        float targetScale = live && pressed ? 0.985f : (hovered && live ? hoverScale : 1f);
         float dim = live ? 1f : 0.4f;
 
         if (background != null)
         {
             Color target = Color.Lerp(fillIdle, fillHover, targetBlend);
+            if (live && pressed)
+            {
+                target = Color.Lerp(target, Color.black, 0.25f);
+            }
+
             target.a *= dim;
             background.color = immediate ? target : Color.Lerp(background.color, target, step);
         }
@@ -131,11 +134,9 @@ public sealed class MenuButtonVisual : MonoBehaviour,
             label.color = immediate ? target : Color.Lerp(label.color, target, step);
         }
 
-        if (rect != null)
-        {
-            Vector3 target = Vector3.one * targetScale;
-            rect.localScale = immediate ? target : Vector3.Lerp(rect.localScale, target, step);
-        }
+        // Hover and press read entirely through colour. The mockups show no scale response on
+        // any button, and a fractional localScale on a rect that parents a TMP label is the
+        // single most reliable way to make SDF text look blurry.
     }
 
     public void OnPointerEnter(PointerEventData eventData) => hovered = true;

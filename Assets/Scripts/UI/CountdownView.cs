@@ -55,7 +55,7 @@ public sealed class CountdownView : MonoBehaviour
         {
             numeral.text = label;
             numeral.color = isGo ? UITheme.Cyan : UITheme.White;
-            numeral.fontSize = isGo ? UITheme.TitleHuge * 1.15f : UITheme.TitleHuge * 1.9f;
+            numeral.fontSize = isGo ? UITheme.DisplayGo : UITheme.DisplayCountdown;
         }
 
         if (isGo)
@@ -99,7 +99,13 @@ public sealed class CountdownView : MonoBehaviour
         }
     }
 
-    /// <summary>Scale-and-fade pop on each step. Unscaled so it survives a paused timescale.</summary>
+    /// <summary>
+    /// Size-and-fade pop on each step. Unscaled so it survives a paused timescale.
+    ///
+    /// Drives fontSize rather than localScale: a scaled transform stretches one already-rendered
+    /// SDF quad, so the numeral arrives soft and only sharpens on the final frame. Re-typesetting
+    /// each frame costs one mesh rebuild on a single glyph and stays crisp throughout.
+    /// </summary>
     private IEnumerator Punch(bool isGo)
     {
         if (numeral == null)
@@ -107,12 +113,15 @@ public sealed class CountdownView : MonoBehaviour
             yield break;
         }
 
-        Transform t = numeral.transform;
+        float target = isGo ? UITheme.DisplayGo : UITheme.DisplayCountdown;
+        float from = target * (isGo ? 0.55f : 1.55f);
         float duration = isGo ? 0.32f : 0.26f;
         float elapsed = 0f;
 
         Color full = numeral.color;
         Color start = new Color(full.r, full.g, full.b, 0f);
+
+        numeral.transform.localScale = Vector3.one;
 
         while (elapsed < duration)
         {
@@ -120,13 +129,13 @@ public sealed class CountdownView : MonoBehaviour
             float k = Mathf.Clamp01(elapsed / duration);
             float ease = 1f - Mathf.Pow(1f - k, 3f);
 
-            t.localScale = Vector3.one * Mathf.Lerp(isGo ? 0.55f : 1.55f, 1f, ease);
+            numeral.fontSize = Mathf.Lerp(from, target, ease);
             numeral.color = Color.Lerp(start, full, Mathf.Clamp01(k * 3f));
 
             yield return null;
         }
 
-        t.localScale = Vector3.one;
+        numeral.fontSize = target;
         numeral.color = full;
         punch = null;
     }

@@ -19,6 +19,9 @@ public sealed class GameManager : MonoBehaviour
     [SerializeField] private PlayerFreezeController player;
     [SerializeField] private FallDetector fallDetector;
 
+    [Tooltip("Optional. Kills the player for a fall too far to survive - Skybound City only.")]
+    [SerializeField] private FallImpactDetector fallImpact;
+
     [Header("Countdown")]
     [SerializeField, Min(1)] private int countdownFrom = 3;
     [SerializeField, Min(0.05f)] private float countdownStepSeconds = 1f;
@@ -62,6 +65,11 @@ public sealed class GameManager : MonoBehaviour
         {
             fallDetector.FellBelowThreshold += HandleFall;
         }
+
+        if (fallImpact != null)
+        {
+            fallImpact.FatalImpact += HandleFallImpact;
+        }
     }
 
     private void OnDisable()
@@ -72,6 +80,11 @@ public sealed class GameManager : MonoBehaviour
         if (fallDetector != null)
         {
             fallDetector.FellBelowThreshold -= HandleFall;
+        }
+
+        if (fallImpact != null)
+        {
+            fallImpact.FatalImpact -= HandleFallImpact;
         }
 
         CancelRoutine(ref countdownRoutine);
@@ -114,6 +127,11 @@ public sealed class GameManager : MonoBehaviour
         if (fallDetector != null)
         {
             fallDetector.Rearm();
+        }
+
+        if (fallImpact != null)
+        {
+            fallImpact.Rearm();
         }
 
         countdownRoutine = StartCoroutine(CountdownThenRun());
@@ -161,6 +179,19 @@ public sealed class GameManager : MonoBehaviour
         if (!Die("fell below the death plane") && fallDetector != null)
         {
             fallDetector.Rearm();
+        }
+    }
+
+    /// <summary>
+    /// A fall that landed too hard. Like <see cref="HandleFall"/>, the detector has already
+    /// disarmed itself, so a refused death has to re-arm it or the player is silently unkillable
+    /// by falling for the rest of the run.
+    /// </summary>
+    private void HandleFallImpact(float metres)
+    {
+        if (!Die($"fell {metres:F1} m") && fallImpact != null)
+        {
+            fallImpact.Rearm();
         }
     }
 
@@ -220,6 +251,10 @@ public sealed class GameManager : MonoBehaviour
 
         if (respawn != null) respawn.RespawnAtCheckpoint();
         if (fallDetector != null) fallDetector.Rearm();
+
+        // Re-armed *after* the teleport, so the apex the player fell from is forgotten along with
+        // the fall - otherwise landing at the anchor would be measured from where they died.
+        if (fallImpact != null) fallImpact.Rearm();
         if (player != null) player.Unfreeze();
         SetState(RunState.Running);
     }

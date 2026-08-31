@@ -1,0 +1,229 @@
+SKYBOUND CITY - ROUTE TIER VALIDATION
+movement source: live controller on 'FPP_Player'
+walk=6 sprint=9 jump=1.5 gravity=-9 launch=5.1962
+
+CLIMB CEILING
+  unassisted jump             1.50 m
+  airborne mantle ceiling     3.30 m
+  storey height               3.60 m
+  margin                      0.30 m   ok
+
+STREET GRAMMAR (flat roof-to-roof crossing)
+  street            width   flat tier     intended
+  alley               4.0   Green         Green        ok
+  secondary           6.5   Blue          Blue         ok
+  avenue             14.0   Unreachable   Unreachable  ok
+  plaza              40.0   Unreachable   Unreachable  ok
+
+AVENUE RULE (drop of one storey onto the far side)
+  drop-assisted design gap  13.627 m
+  avenue width              14.000 m
+  margin                     0.373 m   ok
+
+ROOF CLUSTERS
+  clusters                      30
+  tolerance                   2.00 m
+  worst spread                1.60 m   (ResidentialNorth row 0)
+  violations                     0
+
+ROOFTOP HOPS INSIDE CLUSTERS
+  hops measured                 70
+  Green                         46
+  Blue                          18
+  Orange                         6
+  Red                            0
+  Unreachable                    0
+
+TRAVERSAL NETWORK
+  links                         16   (authored 16)
+  inter-district links           6   (Phase 6C asks for 6)
+  ascents                       42
+  street ways in                13
+  relay sites                    5   (authored 5)
+
+LINKS
+  link                          kind        span  bearing   deckY  step   declared  stairs
+  Center-Residential Span      Skybridge    14.0     32.8   25.20  Green  Green         1
+  Center-Industrial Span       Skybridge    14.0     40.0   10.80  Green  Green         1
+  Center-Corporate Span        Skybridge    30.4     44.6   32.40  Green  Green         1
+  Center-Tower Span            Skybridge    14.0     40.0   19.60  Green  Green         1
+  Quarter-Residential Span     Skybridge    14.0     17.8   12.40  Green  Green         1
+  Quarter-Tower Span           Skybridge    14.0     27.8   16.00  Green  Green         1
+  Residential Ladder           Skybridge    14.0     21.2   19.60  Green  Green         1
+  Yard Crane                   Crane        14.0     76.6   21.60  Blue   Blue          2
+  Cut Span                     Skybridge    36.6     27.8   15.20  Green  Green         1
+  Corporate Spine              Skybridge    47.1     51.0   54.00  Green  Green         1
+  Corporate Core North         Skybridge    39.5     53.7   50.40  Green  Green         1
+  Corporate Core East          Skybridge    39.5     45.9   54.00  Green  Green         1
+  Corporate Core Cross         Skybridge    39.5     61.7   46.80  Green  Green         1
+  Corporate South West         Skybridge    39.5     62.3   57.60  Green  Green         1
+  Corporate South East         Skybridge    39.5     45.4   57.60  Green  Green         0
+  Corporate South Cross        Skybridge    39.5     45.3   39.60  Green  Green         1
+
+ASCENTS (fire escapes, scaffolds, risers, link stairs)
+  ascent                              kind          from      to  steps  rise/step  worst
+  Center-Residential Span (stair)     LinkStair      25.20   28.80      2       1.80  Orange  
+  Center-Industrial Span (stair)      LinkStair      10.80   32.40     12       1.80  Orange  
+  Center-Corporate Span (stair)       LinkStair      32.40   50.40     10       1.80  Orange  
+  Center-Tower Span (stair)           LinkStair      19.60   25.20      4       1.40  Orange  
+  Quarter-Residential Span (stair)    LinkStair      12.40   15.20      2       1.40  Orange  
+  Quarter-Tower Span (stair)          LinkStair      16.00   25.20      6       1.53  Orange  
+  Residential Ladder (stair)          LinkStair      19.60   25.20      4       1.40  Orange  
+  Yard Crane (from stair)             LinkStair      12.40   21.60      6       1.53  Orange  
+  Yard Crane (to stair)               LinkStair      14.40   21.60      4       1.80  Orange  
+  Cut Span (stair)                    LinkStair      15.20   16.00      1       0.80  Blue    
+  Corporate Spine (stair)             LinkStair      54.00   61.20      4       1.80  Orange  
+  Corporate Core North (stair)        LinkStair      50.40   54.00      2       1.80  Orange  
+  Corporate Core East (stair)         LinkStair      54.00   57.60      2       1.80  Orange  
+  Corporate Core Cross (stair)        LinkStair      46.80   50.40      2       1.80  Orange  
+  Corporate South West (stair)        LinkStair      57.60   61.20      2       1.80  Orange  
+  Corporate South Cross (stair)       LinkStair      39.60   57.60     10       1.80  Orange  
+  Center West Escape                  FireEscape      0.00   32.40     18       1.80  Orange  
+  Center East Escape                  FireEscape      0.00   32.40     18       1.80  Orange  
+  Center South Escape                 FireEscape      0.00   19.60     11       1.78  Orange  
+  Residential West Escape             FireEscape      0.00   25.20     14       1.80  Orange  
+  Residential South Escape            FireEscape      0.00   14.40      8       1.80  Orange  
+  Residential North Escape            FireEscape      0.00   25.20     14       1.80  Orange  
+  Yards West Escape                   FireEscape      0.00   11.60      7       1.66  Orange  
+  Yards North Escape                  FireEscape      0.00   18.00     10       1.80  Orange  
+  Construction Scaffold               Scaffold        0.00   14.40      8       1.80  Orange  
+  Construction East Escape            FireEscape      0.00   15.20      9       1.69  Orange  
+  Quarter West Escape                 FireEscape      0.00   16.00      9       1.78  Orange  
+  Quarter East Escape                 FireEscape      0.00   18.00     10       1.80  Orange  
+  Podium East Stair                   FireEscape      0.00   25.20     14       1.80  Orange  
+  Center West Riser                   Riser          19.60   28.80      6       1.53  Orange  
+  Center West Upper Riser             Riser          28.80   32.40      2       1.80  Orange  
+  Center East Riser                   Riser          18.80   29.60      6       1.80  Orange  
+  Center East Upper Riser             Riser          29.60   32.40      2       1.40  Orange  
+  Residential Riser                   Riser          14.40   23.20      5       1.76  Orange  
+  Residential Upper Riser             Riser          23.20   25.20      2       1.00  Orange  
+  Residential North Lower Riser       Riser          15.20   19.60      3       1.47  Orange  
+  Residential North Riser             Riser          15.20   18.00      2       1.40  Orange  
+  Residential North Upper Riser       Riser          18.00   25.20      4       1.80  Orange  
+  Yards Riser                         Riser          10.80   18.00      4       1.80  Orange  
+  Quarter West Riser                  Riser          10.80   18.00      4       1.80  Orange  
+  Quarter East Riser                  Riser          11.60   18.00      4       1.60  Orange  
+
+  steps measured               267
+  Green                          0
+  Blue                           2
+  Orange                       265
+  Red                            0
+  Unreachable                    0
+
+TOWER SPIRAL
+  runs                        8.00   ok
+  rise per run     m          9.98   ok
+  pitch          deg         20.99   ok
+  slope limit    deg         50.00   ok
+  landing to summit m         4.50   ok
+  summit to shaft   m         4.50   ok
+
+STREET ROUTE DEFINITIONS
+  route                            tier    legs   length   waypoints
+  Plaza -> East Avenue             Green      3    143.5        4
+  Plaza -> West Avenue             Green      3    143.5        4
+  Plaza -> North Avenue            Green      3    143.5        4
+  Plaza -> South Avenue            Green      3    143.5        4
+  Avenue Ring                      Green      4    776.0        5
+  Perimeter Ring                   Green      4   2336.0        5
+  North Avenue -> Perimeter        Green      2    390.0        3
+  South Avenue -> Perimeter        Green      2    390.0        3
+  The Cut (descent)                Green      3    176.0        4
+
+ROOFTOP ROUTE DEFINITIONS
+  route                            declared  hops   measured
+  City Center Relay via West Escape Orange       1   Blue        
+  City Center Relay via East Escape Orange       1   Blue        
+  City Center Relay via South Escape Orange       4   Orange      
+  Residential Relay via West Escape Orange       2   Green       
+  Residential Relay via South Escape Orange       2   Orange      
+  Residential Relay via the Ladder Orange       8   Orange      
+  Industrial Relay via the Scaffold Orange       1   Blue        
+  Industrial Relay via East Escape Orange       2   Blue        
+  Industrial Relay via the Crane   Orange       5   Orange      
+  Corporate Relay via Center East  Orange       2   Orange      
+  Corporate Relay via Center South Orange       5   Orange      
+  Corporate Relay via Residential  Orange      11   Orange      
+  Old Quarter Relay via West Escape Orange       2   Green       
+  Old Quarter Relay via East Escape Orange       5   Blue        
+  Old Quarter Relay via Residential Orange       6   Orange      
+  Tower Ascent                     Orange       1   Green       
+
+RELAY ACCESS
+  ways in off the street: 13, minimum per relay: 3
+  relay                    host                          surface  routes
+  Relay_CityCenter         CityCenter_B12                 32.40      13
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_Residential        ResidentialWest_B22            25.20      13
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_Industrial         IndustrialConstruction_B10     14.40      13
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_Corporate          CorporateCore_B01              50.40      13
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  Relay_OldQuarter         OldQuarter_B23                 15.20      13
+      via Center West Escape
+      via Center East Escape
+      via Center South Escape
+      via Residential West Escape
+      via Residential South Escape
+      via Residential North Escape
+      via Yards West Escape
+      via Yards North Escape
+      via Construction Scaffold
+      via Construction East Escape
+      via Quarter West Escape
+      via Quarter East Escape
+      via Podium East Stair
+  the summit               Tower_ShaftRoof               105.00      13
+
+
+RESULT: every authored dimension agrees with the current movement envelope.
