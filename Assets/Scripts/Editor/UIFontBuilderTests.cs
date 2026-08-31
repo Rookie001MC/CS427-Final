@@ -45,7 +45,13 @@ public sealed class UIFontBuilderTests
         Assert.That(Find("MenuCanvas/MainPanel/TitleTop").fontSize, Is.EqualTo(UITheme.TitleHero),
             "The wordmark carries the menu and is the largest type on it.");
         Assert.That(Find("MenuCanvas/MainPanel/PlayRow/Label").fontSize, Is.EqualTo(UITheme.MenuRow));
-        Assert.That(Find("MenuCanvas/LevelSelectPanel/TitleTop").fontSize, Is.EqualTo(UITheme.TitleMedium));
+        Assert.That(Find("MenuCanvas/TrainingPanel/TitleTop").fontSize, Is.EqualTo(UITheme.TitleMedium));
+
+        // The main run's name is the largest headline on any screen but the wordmark, and it is
+        // auto-sized so a longer level name can shrink rather than clip - so the number pinned here
+        // is the ceiling it starts from.
+        Assert.That(Find("MenuCanvas/MainRunPanel/Title").fontSizeMax, Is.EqualTo(UITheme.TitleHuge),
+            "The main run's name carries the PLAY screen.");
     }
 
     [Test]

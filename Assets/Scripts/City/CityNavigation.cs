@@ -110,6 +110,15 @@ public readonly struct NavLink
 /// world while the player moves past them - and which of them are showing is a projection of the
 /// player onto that same arc, which is continuous, instead of a per-frame distance test with a hard
 /// threshold to oscillate across.
+///
+/// <see cref="Remaining"/> is the field that makes it stop flickering when the <i>route</i>
+/// changes, which is the harder half and the one that was still wrong. A marker's arc position is
+/// measured from the start of the route, and the start of the route is the node the player is
+/// standing on - so stepping from one rooftop node to the next re-anchored every marker in the
+/// city, and 114 of 116 markers on a stretch of route that both searches agreed about landed in a
+/// different place. Measured backwards from the objective instead, a stretch of route shared by two
+/// searches is the same distance from the end in both, so it gets the same markers in the same
+/// square metres however the player came to be on it.
 /// </summary>
 public readonly struct Breadcrumb
 {
@@ -121,6 +130,12 @@ public readonly struct Breadcrumb
     /// <summary>Metres from the start of the route.</summary>
     public readonly float Along;
 
+    /// <summary>
+    /// Metres from here to the objective, along the route. The marker's identity: invariant under
+    /// a re-search that keeps this stretch of the route, which <see cref="Along"/> is not.
+    /// </summary>
+    public readonly float Remaining;
+
     /// <summary>What the player has to do next, at or just after this point.</summary>
     public readonly NavMove Move;
 
@@ -128,13 +143,14 @@ public readonly struct Breadcrumb
     public readonly bool IsTransition;
 
     public Breadcrumb(Vector3 position, Vector3 forward, float along, NavMove move,
-        bool isTransition)
+        bool isTransition, float remaining = 0f)
     {
         Position = position;
         Forward = forward;
         Along = along;
         Move = move;
         IsTransition = isTransition;
+        Remaining = remaining;
     }
 }
 
@@ -1494,17 +1510,76 @@ public static class CityNavigation
     }
 
     /// <summary>
+    /// Every marker the whole route wants, in arc order, with collisions resolved and no window
+    /// applied at all, filling a list the caller owns.
+    ///
+    /// This is what <see cref="RouteTrail"/> holds. The windowed <see cref="Breadcrumbs"/> above
+    /// is a view of it, and the guide used to re-derive that view as the player ran - which meant
+    /// the set of markers in existence was a function of where the player had got to, and a marker
+    /// was therefore a thing that came into being rather than a thing that was already there. Laid
+    /// once per route, a marker is an object with a lifetime, and the pool can bind to it.
+    /// </summary>
+    public static void LayRoute(List<Vector3> polyline, List<NavMove> moves, List<Breadcrumb> into)
+    {
+        into.Clear();
+
+        if (polyline == null || polyline.Count < 2)
+        {
+            return;
+        }
+
+        into.AddRange(Lay(polyline, moves));
+    }
+
+    /// <summary>
     /// Every marker the whole route wants, in arc order, with collisions already resolved.
     ///
     /// Independent of the player and of the visible window, which is the property the trail's
     /// stability rests on: two views of the same route are the same markers, filtered differently.
+    ///
+    /// The resample is phased so that markers land at whole multiples of the spacing measured
+    /// <b>backwards from the objective</b> rather than forwards from the start. That is not a
+    /// cosmetic choice. The start of the route is the node the player is standing on, so it moves
+    /// whenever they step across a rooftop boundary - and with a forward phase every marker in the
+    /// city then slid by up to a spacing, including the ones out on a stretch of route that both
+    /// searches completely agreed about. Measured from the end, a shared stretch is the same
+    /// distance from the objective in both searches, so it gets the same markers in the same square
+    /// metres and a re-search is invisible everywhere except where the route really did change.
     /// </summary>
     private static List<Breadcrumb> Lay(List<Vector3> polyline, List<NavMove> moves)
     {
         List<Breadcrumb> laid = new List<Breadcrumb>();
         float spacing = CityDesign.GuideBreadcrumbSpacing;
         float travelled = 0f;
-        float nextAt = spacing;
+
+        float total = 0f;
+
+        for (int i = 0; i < polyline.Count - 1; i++)
+        {
+            total += (polyline[i + 1] - polyline[i]).magnitude;
+        }
+
+        // The phase that puts every marker a whole number of spacings back from the objective.
+        float phase = total - Mathf.Floor(total / spacing) * spacing;
+
+        if (phase <= 0.001f)
+        {
+            phase = spacing;
+        }
+
+        // The last one is a whole spacing short of the objective, not on it. Two reasons, and the
+        // second is the one that bit: a chevron laid at the destination stands inside the beacon on
+        // the relay pad the player is running at, and - because it sits exactly at the end of the
+        // arc - whether the resample emitted it at all came down to a few ULPs of drift in the
+        // accumulator. Two routes to the same relay accumulate that drift differently, so one drew
+        // a marker there and the other did not, and Mono and RyuJIT disagreed about which. It is
+        // the only marker in the city whose existence was a rounding question.
+        float ceiling = total - spacing * 0.5f;
+
+        // Counted rather than accumulated, so a 600 m route's last marker is still exactly a
+        // multiple of the spacing from the objective instead of ninety additions away from one.
+        int tick = 0;
+        float nextAt = phase;
 
         // The last horizontal heading the route actually had. A climb goes straight up, and a
         // marker whose heading came out vertical used to fall back to whatever rotation the pool
@@ -1530,7 +1605,7 @@ public static class CityNavigation
             // standing on it has to announce.
             NavMove move = moves != null && i + 1 < moves.Count ? moves[i + 1] : NavMove.Walk;
 
-            while (nextAt <= travelled + length)
+            while (nextAt <= travelled + length && nextAt < ceiling)
             {
                 // The counter advances whether or not the marker survives. That is the whole of
                 // what anchors the trail: a marker's arc position is a multiple of the spacing
@@ -1539,10 +1614,11 @@ public static class CityNavigation
                 // markers it emitted and reset it at every corner, which meant the same route drew
                 // its chevrons in different places depending on where the search had begun - all
                 // twenty-six of them sliding up to 7 m at once, every time the route was re-found.
-                Keep(laid, new Breadcrumb(Vector3.Lerp(from, to, (nextAt - travelled) / length),
-                    heading, nextAt, move, false));
+                laid.Add(new Breadcrumb(Vector3.Lerp(from, to, (nextAt - travelled) / length),
+                    heading, nextAt, move, false, total - nextAt));
 
-                nextAt += spacing;
+                tick++;
+                nextAt = phase + tick * spacing;
             }
 
             travelled += length;
@@ -1559,7 +1635,13 @@ public static class CityNavigation
             //   * the player has to *do* something there - climb, jump, cross. That one is never
             //     skipped, whatever else is nearby, because it is the only thing on the trail that
             //     says what the next action is rather than merely which way it is.
-            bool nearAMultiple = Mathf.Abs(travelled - Mathf.Round(travelled / spacing) * spacing)
+            // Asked as a distance from the objective, which is the axis the resample is phased on.
+            // Asked about the distance from the *start* instead, this answered differently for two
+            // routes that agreed about this corner - and asked as `travelled - phase` it was the
+            // same number arrived at by subtracting two large ones, so it answered differently
+            // again between runtimes.
+            float fromEnd = total - travelled;
+            bool nearAMultiple = Mathf.Abs(fromEnd - Mathf.Round(fromEnd / spacing) * spacing)
                                  < spacing * 0.4f;
 
             if (move == NavMove.Walk && nearAMultiple)
@@ -1567,40 +1649,68 @@ public static class CityNavigation
                 continue;
             }
 
-            Keep(laid, new Breadcrumb(to, Flat(polyline[i + 2] - to, heading), travelled, move,
-                true));
+            laid.Add(new Breadcrumb(to, Flat(polyline[i + 2] - to, heading), travelled, move,
+                true, total - travelled));
         }
 
-        return laid;
+        return Resolve(laid);
     }
 
     /// <summary>
-    /// Adds a marker unless it would be standing on the one before it.
+    /// Drops any marker that would be standing on its neighbour, working <b>backwards from the
+    /// objective</b>.
     ///
-    /// A transition displaces what it collides with rather than being dropped: it is the marker
-    /// carrying the next move, and an upright marker stands on it. A plain resampled chevron gives
-    /// way, because the run it is measuring out is drawn either side of it anyway.
+    /// The rule itself is unchanged and is worth restating: two markers within
+    /// <see cref="CityDesign.GuideMarkerClearGap"/> of each other share pixels, which is a z-fight,
+    /// which is two surfaces swapping which one is in front as the camera turns. Where two collide
+    /// the transition survives - it is the one carrying the next move, and an upright marker stands
+    /// on it - and a plain resampled chevron gives way, because the run it is measuring out is
+    /// drawn either side of it anyway.
+    ///
+    /// The <i>direction</i> is the fix. Resolved forwards, a marker's survival depends on the
+    /// marker before it, so it depends transitively on the whole head of the route - and the head
+    /// of the route is whatever node the player happened to be standing on when the search ran.
+    /// Two routes that agree completely about a stretch of city could therefore disagree about one
+    /// marker on it, right at the junction where they merge, and the disagreement could propagate
+    /// forwards from there. It was a borderline `>=` on a float, so it also decided differently
+    /// under Mono and under RyuJIT, which is why it passed offline and failed in the editor.
+    ///
+    /// Resolved from the objective end, a marker's survival depends only on markers between it and
+    /// the objective - which two merged routes share by construction - so a shared stretch is laid
+    /// identically whichever search produced it, exactly and on every runtime.
     /// </summary>
-    private static void Keep(List<Breadcrumb> laid, Breadcrumb crumb)
+    private static List<Breadcrumb> Resolve(List<Breadcrumb> laid)
     {
-        if (laid.Count == 0)
+        List<Breadcrumb> kept = new List<Breadcrumb>();
+
+        for (int i = laid.Count - 1; i >= 0; i--)
         {
-            laid.Add(crumb);
-            return;
+            Breadcrumb crumb = laid[i];
+
+            if (kept.Count == 0)
+            {
+                kept.Add(crumb);
+                continue;
+            }
+
+            Breadcrumb nearer = kept[kept.Count - 1];
+
+            if ((nearer.Position - crumb.Position).magnitude >= CityDesign.GuideMarkerClearGap)
+            {
+                kept.Add(crumb);
+                continue;
+            }
+
+            // They collide. The transition wins; if both are, the one nearer the objective is the
+            // one the player reaches second and needs to still be there, so it stays.
+            if (crumb.IsTransition && !nearer.IsTransition)
+            {
+                kept[kept.Count - 1] = crumb;
+            }
         }
 
-        Breadcrumb last = laid[laid.Count - 1];
-
-        if ((last.Position - crumb.Position).magnitude >= CityDesign.GuideMarkerClearGap)
-        {
-            laid.Add(crumb);
-            return;
-        }
-
-        if (crumb.IsTransition)
-        {
-            laid[laid.Count - 1] = crumb;
-        }
+        kept.Reverse();
+        return kept;
     }
 
     /// <summary>

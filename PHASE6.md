@@ -16,7 +16,7 @@ maps and are **not modified by any Phase 6 work**. Skybound City is a new, separ
 | 6C | Traversal: rooftops, fire escapes, skybridges, crane, scaffolding, all 6 inter-district links, every jump tiered | `RouteTierValidator` reports 0 FAIL; every relay reachable by ≥ 3 routes | done |
 | 6D | Objectives: set-based `CheckpointManager`, `ObjectiveRelay`, `ObjectiveTracker`, `RespawnAnchor`, `FallImpactDetector`, `ObjectiveCompass`, tower unlock | Mission completable in any relay order | done |
 | **6E** | **Environment art: `CityDressing` - facade depth, windows, cornices, rooftop machinery, props, district colour zoning, signage, street furniture, dressed traversal, backdrop ring, dusk lighting, mission HUD. Plus `CityNavigation` / `RouteGuide` world-space route guidance.** | **Reads as architecture, not boxes. 3006 decorative pieces, 0 new colliders, 3465 / 3800 renderers. Every objective routable from all 13 ways up, no leg through a building.** | **done** |
-| 6F | Integration: `Level03_SkyboundCity` LevelEntry, build settings, menu card, relay HUD wording | Playable start-to-finish from the Main Menu | not started |
+| 6F | Integration: `Level03_SkyboundCity` LevelEntry, build settings, `LevelInfo`, and a menu that presents it as the main run rather than the third of three maps | PLAY launches Skybound City; the two older maps are grouped under TRAINING | **LevelEntry + build settings + menu done**; in-level pause / countdown / death / complete panels still to do |
 | 6G | Optimisation: occlusion bake, lighting bake, collider audit, profiling | ≥ 60 fps at 1080p; budgets met | not started |
 
 ## The three Phase 6A.5 corrections to the 6A design
@@ -385,8 +385,14 @@ columns and turn the one picture in that report into two black bars.
 
 ### What Phase 6E deliberately did not do
 
-* No LevelEntry asset, build-settings registration or menu card — 6F.
-* No pause, countdown, death or level-complete panels — 6F.
+* No pause, countdown, death or level-complete panels — 6F. **This is the one thing still missing
+  from a Skybound City reached through PLAY: the level runs, but ESC has no pause panel, so there
+  is no in-level route back to the menu.** `GameplayUIBuilder.Build()` against this scene would
+  supply all four, and is deliberately not called yet because it would put a second HUD canvas over
+  the mission readout `SkyboundCityBuilder` already builds.
+* ~~No LevelEntry asset, build-settings registration or menu card~~ — done. `Level03_SkyboundCity`
+  is in `Assets/Data`, `SkyboundCity.unity` is in Build Settings, the scene carries a `LevelInfo`
+  pointing at that asset, and the main menu's PLAY screen is built from it.
 * No occlusion or lighting bake, and no LODs — 6G. Everything emitted is marked static, so all
   three are available to it.
 * No change to any collider, footprint, roof height, link, ascent, relay, anchor or trigger.

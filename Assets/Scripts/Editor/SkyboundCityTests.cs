@@ -3505,17 +3505,30 @@ public sealed class SkyboundCityTests
                     before.Add(crumb.Along);
                 }
 
-                // The upright markers are a subset of the chevrons, so they cannot churn on their
-                // own - but say so, because a pool that showed four and then two would read as a
-                // flicker whatever the chevrons did.
+                // The upright markers come off the same laid trail as the chevrons, so they
+                // cannot churn on their own - but say so, because a pool that showed four and then
+                // two would read as a flicker whatever the chevrons did.
                 Assert.That(actions.Count,
                     Is.LessThanOrEqualTo(CityDesign.GuideActionMarkerCount));
 
+                // And they are the *only* marker on their spot. This assertion used to be its own
+                // inverse - it required a ground chevron under every upright marker - which is what
+                // stood a three-metre post with an arrowhead on top through the middle of a flat
+                // chevron lying on the floor. Two solids sharing an origin is a z-fight, and a
+                // z-fight is what flickers as the camera turns.
                 foreach (Breadcrumb action in actions)
                 {
-                    Assert.That(HoldsAlong(chevrons, action.Along), Is.True,
-                        $"{id}: an upright marker at {action.Along:F1} m stands where no chevron " +
-                        "is, so the two pools disagree about the route.");
+                    Assert.That(HoldsAlong(chevrons, action.Along), Is.False,
+                        $"{id}: a ground chevron is being drawn inside the upright marker at " +
+                        $"{action.Along:F1} m, so the two pools are fighting over the same pixels.");
+
+                    foreach (Breadcrumb chevron in chevrons)
+                    {
+                        Assert.That((chevron.Position - action.Position).magnitude,
+                            Is.GreaterThanOrEqualTo(CityDesign.GuideMarkerClearGap - 0.001f),
+                            $"{id}: a chevron stands {(chevron.Position - action.Position).magnitude:F2} m " +
+                            $"from the upright marker at {action.Along:F1} m.");
+                    }
                 }
             }
 
@@ -3911,6 +3924,527 @@ public sealed class SkyboundCityTests
                 Is.LessThan(0.001f),
                 $"At {degrees} degrees the written-out basis and LookRotation disagree.");
         }
+    }
+
+    // ------------------------------------------------------------------ persistent route state
+
+    /// <summary>
+    /// Two searches that agree about a stretch of route put their markers in the same places on it.
+    ///
+    /// This is the fault that was left, and it is the one a player on a rooftop sees. A marker's
+    /// place on the route was measured from the start of the route, and the start of the route is
+    /// the node the player is standing on - so stepping across a boundary between two roof nodes
+    /// re-anchored every chevron in the city, including the ones two hundred metres away on a
+    /// stretch both searches completely agreed about. Measured over this city's twenty pairs of
+    /// routes that share a tail, 114 of 116 markers on the shared part moved.
+    ///
+    /// The fix is in <see cref="CityNavigation"/>: markers are resampled at whole spacings measured
+    /// <b>backwards from the objective</b>, so a shared stretch is the same distance from the end in
+    /// both routes and therefore gets the same markers. This is the test that says so, and it is
+    /// deliberately about the marker geometry rather than about a frame count: a re-search that
+    /// changes nothing visible is a re-search nobody has to prevent.
+    /// </summary>
+    [Test]
+    public void Guidance_TwoRoutesThatShareAStretchLayTheSameMarkersOnIt()
+    {
+        CityPlanResult plan = Plan;
+        CityNavigation.Result nav = Nav(plan);
+        CityNavGraph graph = nav.Graph;
+
+        int pairs = 0;
+        int matched = 0;
+        int moved = 0;
+
+        foreach (string id in TargetIds(nav))
+        {
+            int to = graph.IndexOf(nav.Targets[id]);
+            List<int> starts = new List<int> { graph.Nearest(CityDesign.SpawnPosition) };
+
+            foreach (RelayObjective relay in plan.Objectives.Relays)
+            {
+                int node = graph.IndexOf(relay.Node);
+
+                if (node >= 0 && node != to)
+                {
+                    starts.Add(node);
+                }
+            }
+
+            for (int a = 0; a < starts.Count; a++)
+            {
+                for (int b = a + 1; b < starts.Count; b++)
+                {
+                    List<NavMove> movesA = new List<NavMove>();
+                    List<NavMove> movesB = new List<NavMove>();
+                    List<int> pathA = graph.Path(starts[a], to);
+                    List<int> pathB = graph.Path(starts[b], to);
+
+                    if (pathA == null || pathB == null)
+                    {
+                        continue;
+                    }
+
+                    Vector3 destination = graph.Nodes[to].Position;
+                    List<Vector3> lineA = graph.Waypoints(graph.Nodes[starts[a]].Position, pathA,
+                        destination, movesA);
+                    List<Vector3> lineB = graph.Waypoints(graph.Nodes[starts[b]].Position, pathB,
+                        destination, movesB);
+
+                    // How much of the two routes is literally the same line, walked back from the
+                    // objective. Only that part is being claimed about: where the routes differ the
+                    // markers are supposed to differ.
+                    int shared = 0;
+
+                    while (shared < lineA.Count && shared < lineB.Count
+                           && (lineA[lineA.Count - 1 - shared]
+                               - lineB[lineB.Count - 1 - shared]).sqrMagnitude < 0.01f)
+                    {
+                        shared++;
+                    }
+
+                    if (shared < 3)
+                    {
+                        continue;
+                    }
+
+                    pairs++;
+
+                    List<Breadcrumb> crumbsA = new List<Breadcrumb>();
+                    List<Breadcrumb> crumbsB = new List<Breadcrumb>();
+                    CityNavigation.LayRoute(lineA, movesA, crumbsA);
+                    CityNavigation.LayRoute(lineB, movesB, crumbsB);
+
+                    // How long the shared part is, measured back from the objective. A marker is on
+                    // it if it is nearer the end than that - which is exact, where "is this point
+                    // geometrically on that line" is not: a route that comes back down a street it
+                    // already ran would answer yes for a marker on the outward leg.
+                    float tail = 0f;
+
+                    for (int i = lineA.Count - shared; i < lineA.Count - 1; i++)
+                    {
+                        tail += (lineA[i + 1] - lineA[i]).magnitude;
+                    }
+
+                    foreach (Breadcrumb crumb in crumbsA)
+                    {
+                        if (crumb.Remaining > tail - 0.001f)
+                        {
+                            continue;
+                        }
+
+                        bool found = false;
+
+                        foreach (Breadcrumb other in crumbsB)
+                        {
+                            if ((crumb.Position - other.Position).sqrMagnitude < 0.01f)
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (found)
+                        {
+                            matched++;
+                        }
+                        else
+                        {
+                            moved++;
+                            Assert.That(found, Is.True,
+                                $"{id}: the marker at {crumb.Position} is on a stretch of route " +
+                                $"that the search from {graph.Nodes[starts[a]].Name} and the one " +
+                                $"from {graph.Nodes[starts[b]].Name} completely agree about, but " +
+                                "only one of them draws it there.");
+                        }
+                    }
+                }
+            }
+        }
+
+        Assert.That(pairs, Is.GreaterThan(10),
+            $"Only {pairs} pairs of routes share a tail, so this proves nothing.");
+        Assert.That(matched, Is.GreaterThan(200),
+            $"Only {matched} markers measured on shared route, so this proves nothing.");
+        Assert.That(moved, Is.Zero);
+    }
+
+    /// <summary>
+    /// A marker is laid backwards from the objective, so it is a whole number of spacings from it.
+    ///
+    /// The property the test above rests on, stated on its own so that a regression in the phase
+    /// says which of the two it is.
+    /// </summary>
+    [Test]
+    public void Guidance_EveryResampledMarkerIsAWholeSpacingFromTheObjective()
+    {
+        CityPlanResult plan = Plan;
+        CityNavigation.Result nav = Nav(plan);
+        CityNavGraph graph = nav.Graph;
+        int spawn = graph.Nearest(CityDesign.SpawnPosition);
+        int measured = 0;
+
+        foreach (string id in TargetIds(nav))
+        {
+            int to = graph.IndexOf(nav.Targets[id]);
+            List<NavMove> moves = new List<NavMove>();
+            List<Vector3> line = graph.Waypoints(graph.Nodes[spawn].Position, graph.Path(spawn, to),
+                graph.Nodes[to].Position, moves);
+
+            List<Breadcrumb> crumbs = new List<Breadcrumb>();
+            CityNavigation.LayRoute(line, moves, crumbs);
+
+            float length = 0f;
+
+            for (int i = 0; i < line.Count - 1; i++)
+            {
+                length += (line[i + 1] - line[i]).magnitude;
+            }
+
+            Assert.That(crumbs, Is.Not.Empty);
+
+            foreach (Breadcrumb crumb in crumbs)
+            {
+                Assert.That(crumb.Remaining, Is.EqualTo(length - crumb.Along).Within(0.01f),
+                    $"{id}: a marker's Remaining does not agree with its Along.");
+
+                if (crumb.IsTransition)
+                {
+                    // A corner is kept wherever it falls, which is the whole point of it.
+                    continue;
+                }
+
+                measured++;
+                float spacings = crumb.Remaining / CityDesign.GuideBreadcrumbSpacing;
+
+                Assert.That(Mathf.Abs(spacings - Mathf.Round(spacings)), Is.LessThan(0.001f),
+                    $"{id}: a resampled marker is {crumb.Remaining:F2} m from the objective, " +
+                    $"which is not a whole {CityDesign.GuideBreadcrumbSpacing:F0} m spacing - so " +
+                    "a route found from somewhere else would put its markers elsewhere.");
+            }
+        }
+
+        Assert.That(measured, Is.GreaterThan(100));
+    }
+
+    /// <summary>
+    /// A pool object stays on the marker it is drawing, for as long as the trail draws it.
+    ///
+    /// The last of the flicker, and the only one that a still frame cannot show. The pool used to
+    /// give slot i the i-th visible marker, so running past the nearest chevron shifted every marker
+    /// behind it down a slot: over this 400 m run twenty-six live objects were teleported - up to
+    /// 30 m - and re-aimed, some of them through 90 degrees, 513 times, while 36 markers genuinely
+    /// came into view. Thirteen unnecessary discontinuous moves for every real one, sixty times a
+    /// second, in front of the camera.
+    ///
+    /// The claim is exact rather than statistical: the number of times an object is put on a marker
+    /// it was not already on must equal the number of markers that have entered the drawn window,
+    /// and no more.
+    /// </summary>
+    [Test]
+    public void Guidance_APoolObjectStaysOnTheMarkerItIsDrawing()
+    {
+        CityPlanResult plan = Plan;
+        CityNavigation.Result nav = Nav(plan);
+        CityNavGraph graph = nav.Graph;
+        int spawn = graph.Nearest(CityDesign.SpawnPosition);
+
+        foreach (string id in TargetIds(nav))
+        {
+            int to = graph.IndexOf(nav.Targets[id]);
+            Vector3 destination = graph.Nodes[to].Position;
+            List<Vector3> line = graph.Waypoints(graph.Nodes[spawn].Position, graph.Path(spawn, to),
+                destination);
+
+            float length = 0f;
+
+            for (int i = 0; i < line.Count - 1; i++)
+            {
+                length += (line[i + 1] - line[i]).magnitude;
+            }
+
+            RouteTrail trail = new RouteTrail(graph, Budget);
+            GuideMarkerPool pool = new GuideMarkerPool(CityDesign.GuideMarkerCount);
+            GuideMarkerPool uprights = new GuideMarkerPool(CityDesign.GuideActionMarkerCount);
+
+            List<Breadcrumb> chevrons = new List<Breadcrumb>();
+            List<Breadcrumb> actions = new List<Breadcrumb>();
+            List<int> slots = new List<int>();
+            List<bool> fresh = new List<bool>();
+            List<int> release = new List<int>();
+
+            // What each slot is standing on, as the view would have written it.
+            Vector3[] standing = new Vector3[CityDesign.GuideMarkerCount];
+            Vector3[] aimed = new Vector3[CityDesign.GuideMarkerCount];
+            bool[] on = new bool[CityDesign.GuideMarkerCount];
+
+            HashSet<long> showing = new HashSet<long>();
+            int entered = 0;
+            int moved = 0;
+            int reaimed = 0;
+            int frames = 0;
+
+            for (float travelled = 0f; travelled < length; travelled += 8f / 60f)
+            {
+                Vector3 at = PointAlong(line, travelled);
+                at.x += Mathf.Sin(frames * 0.19f);
+                at.z += Mathf.Cos(frames * 0.23f);
+                frames++;
+
+                trail.Step(at, id, to, destination);
+                trail.Visible(CityDesign.GuideMarkerCount, CityDesign.GuideActionMarkerCount,
+                    chevrons, actions);
+
+                // How many markers genuinely came into view this frame - the floor on how much
+                // work the pool can possibly be asked to do.
+                HashSet<long> now = new HashSet<long>();
+
+                foreach (Breadcrumb crumb in chevrons)
+                {
+                    long key = GuideMarkerPool.Key(crumb);
+                    now.Add(key);
+
+                    if (!showing.Contains(key))
+                    {
+                        entered++;
+                    }
+                }
+
+                showing = now;
+
+                uprights.Bind(actions, slots, fresh, release);
+                pool.Bind(chevrons, slots, fresh, release);
+
+                foreach (int slot in release)
+                {
+                    on[slot] = false;
+                }
+
+                for (int i = 0; i < chevrons.Count; i++)
+                {
+                    Assert.That(slots[i], Is.GreaterThanOrEqualTo(0),
+                        $"{id}: the pool had no object for a marker it is being asked to draw.");
+
+                    int slot = slots[i];
+
+                    if (on[slot])
+                    {
+                        if ((standing[slot] - chevrons[i].Position).magnitude > 0.001f)
+                        {
+                            moved++;
+                        }
+
+                        if (Vector3.Angle(aimed[slot], chevrons[i].Forward) > 0.01f)
+                        {
+                            reaimed++;
+                        }
+                    }
+
+                    on[slot] = true;
+                    standing[slot] = chevrons[i].Position;
+                    aimed[slot] = chevrons[i].Forward;
+                }
+            }
+
+            Assert.That(frames, Is.GreaterThan(500), $"{id}: too short a run to mean anything.");
+            Assert.That(moved, Is.Zero,
+                $"{id}: a pool object was moved to a different patch of ground {moved} time(s) " +
+                "without being rebound, over a run in which nothing it was drawing had moved.");
+            Assert.That(reaimed, Is.Zero,
+                $"{id}: a pool object was turned to face a different way {reaimed} time(s) " +
+                "while it was standing on the same marker.");
+            Assert.That(pool.Rebinds, Is.EqualTo(entered),
+                $"{id}: the pool put an object on a new marker {pool.Rebinds} time(s) over " +
+                $"{frames} frames, against {entered} marker(s) that actually came into view.");
+            Assert.That(pool.Toggles, Is.LessThanOrEqualTo(entered * 2),
+                $"{id}: {pool.Toggles} enables and disables for {entered} markers.");
+        }
+    }
+
+    /// <summary>
+    /// A player who has arrived and is walking about on the objective does not search the city.
+    ///
+    /// `NeedsSearch` has a clause for "the route has run out and the objective is still somewhere
+    /// else", which is right, and which a player standing twelve metres from the pad they are being
+    /// sent to satisfies on every frame: 938 Dijkstras in 1200 frames, every one of them returning
+    /// the route already being drawn. That is not visible, and it is a per-frame graph search in a
+    /// component whose entire purpose is not to do one.
+    ///
+    /// It is fixed by arithmetic rather than by a timer: a search is a pure function of the node it
+    /// starts from, the node it ends on and the objective's position, so a search with all three
+    /// unchanged since the last one cannot say anything new.
+    /// </summary>
+    [Test]
+    public void Guidance_DoesNotSearchWhileMillingAboutOnTheObjective()
+    {
+        CityPlanResult plan = Plan;
+        CityNavigation.Result nav = Nav(plan);
+        CityNavGraph graph = nav.Graph;
+
+        foreach (string id in TargetIds(nav))
+        {
+            int to = graph.IndexOf(nav.Targets[id]);
+            Vector3 destination = graph.Nodes[to].Position;
+            RouteTrail trail = new RouteTrail(graph, Budget);
+
+            for (int frame = 0; frame < 1200; frame++)
+            {
+                Vector3 at = destination + new Vector3(Mathf.Sin(frame * 0.04f) * 12f, 1f,
+                    Mathf.Cos(frame * 0.031f) * 12f);
+
+                trail.Step(at, id, to, destination);
+            }
+
+            Assert.That(trail.Searches, Is.LessThanOrEqualTo(2),
+                $"{id}: walking a twelve-metre circle round the objective searched the city " +
+                $"{trail.Searches} time(s) in 1200 frames.");
+            Assert.That(trail.Lays, Is.LessThanOrEqualTo(2),
+                $"{id}: the same walk laid the markers out {trail.Lays} time(s).");
+        }
+    }
+
+    /// <summary>
+    /// Walking every square metre of a rooftop searches once and lays the markers out once.
+    ///
+    /// The other roof tests walk a circle or a line; this one walks the whole surface on a one-metre
+    /// grid, out to two metres from every edge, which is 4988 positions on the largest Industrial
+    /// roof. It is the strongest form of the claim the guide's stability rests on: the route is a
+    /// property of the graph, and a roof is one node of it however big it is.
+    /// </summary>
+    [Test]
+    public void Guidance_SweepingAWholeRoofSearchesOnceAndLaysOutOnce()
+    {
+        CityPlanResult plan = Plan;
+        CityNavigation.Result nav = Nav(plan);
+        CityNavGraph graph = nav.Graph;
+        string id = null;
+
+        foreach (string candidate in TargetIds(nav))
+        {
+            id = candidate;
+            break;
+        }
+
+        int to = graph.IndexOf(nav.Targets[id]);
+        Vector3 destination = graph.Nodes[to].Position;
+        int swept = 0;
+
+        foreach (RelayObjective relay in plan.Objectives.Relays)
+        {
+            int node = graph.IndexOf(relay.Node);
+
+            if (node < 0 || node == to)
+            {
+                continue;
+            }
+
+            NavNode surface = graph.Nodes[node];
+            RouteTrail trail = new RouteTrail(graph, Budget);
+            int positions = 0;
+            int flips = 0;
+            int held = -2;
+
+            for (float z = -surface.Extent.z + 1f; z <= surface.Extent.z - 1f; z += 1f)
+            {
+                for (float x = -surface.Extent.x + 1f; x <= surface.Extent.x - 1f; x += 1f)
+                {
+                    trail.Step(new Vector3(surface.Position.x + x, surface.Position.y + 1f,
+                        surface.Position.z + z), id, to, destination);
+
+                    positions++;
+
+                    if (held != -2 && trail.StandingOn != held)
+                    {
+                        flips++;
+                    }
+
+                    held = trail.StandingOn;
+                }
+            }
+
+            Assert.That(positions, Is.GreaterThan(300),
+                $"{relay.Node} is too small a roof for this to prove anything.");
+            Assert.That(flips, Is.Zero,
+                $"{relay.Node}: the node under the player changed {flips} time(s) while they " +
+                "walked one roof.");
+            Assert.That(trail.Searches, Is.EqualTo(1),
+                $"{relay.Node}: sweeping the whole roof searched the city {trail.Searches} " +
+                $"time(s) over {positions} positions.");
+            Assert.That(trail.Lays, Is.EqualTo(1),
+                $"{relay.Node}: sweeping the whole roof laid the markers out {trail.Lays} time(s).");
+
+            swept++;
+        }
+
+        Assert.That(swept, Is.GreaterThan(2));
+    }
+
+    /// <summary>
+    /// The pool frees the slots it is about to need before it hands any out.
+    ///
+    /// A pool of twenty-six drawing twenty-six markers has nothing spare, so a frame in which one
+    /// marker leaves the window and another enters it can only be served if the leaving one is
+    /// released first. Allocating first leaves the new marker undrawn for a frame - which is the far
+    /// end of the trail blinking off and on again, once every seven metres, for the whole run.
+    /// </summary>
+    [Test]
+    public void Guidance_ThePoolReleasesBeforeItAllocates()
+    {
+        List<Breadcrumb> wanted = new List<Breadcrumb>();
+        GuideMarkerPool pool = new GuideMarkerPool(4);
+        List<int> slots = new List<int>();
+        List<bool> fresh = new List<bool>();
+        List<int> release = new List<int>();
+
+        for (int i = 0; i < 4; i++)
+        {
+            wanted.Add(new Breadcrumb(new Vector3(i * 10f, 0f, 0f), Vector3.forward, i * 10f,
+                NavMove.Walk, false, 100f - i * 10f));
+        }
+
+        pool.Bind(wanted, slots, fresh, release);
+
+        Assert.That(pool.Rebinds, Is.EqualTo(4));
+        Assert.That(release, Is.Empty);
+
+        for (int step = 0; step < 20; step++)
+        {
+            // The window slides by one: the nearest marker goes, one more arrives at the far end.
+            wanted.RemoveAt(0);
+            wanted.Add(new Breadcrumb(new Vector3((step + 4) * 10f, 0f, 0f), Vector3.forward,
+                (step + 4) * 10f, NavMove.Walk, false, 0f));
+
+            int before = pool.Rebinds;
+            pool.Bind(wanted, slots, fresh, release);
+
+            Assert.That(release.Count, Is.EqualTo(1),
+                $"Step {step}: {release.Count} slot(s) released for one marker leaving the window.");
+            Assert.That(pool.Rebinds - before, Is.EqualTo(1),
+                $"Step {step}: {pool.Rebinds - before} object(s) put on a new marker for one " +
+                "marker entering the window.");
+
+            for (int i = 0; i < wanted.Count; i++)
+            {
+                Assert.That(slots[i], Is.GreaterThanOrEqualTo(0),
+                    $"Step {step}: marker {i} was left undrawn, so it blinks.");
+            }
+
+            int freshCount = 0;
+
+            foreach (bool f in fresh)
+            {
+                if (f)
+                {
+                    freshCount++;
+                }
+            }
+
+            Assert.That(freshCount, Is.EqualTo(1),
+                $"Step {step}: {freshCount} marker(s) had to be moved and re-aimed.");
+        }
+
+        // Two markers can never share a slot, and a slot can never hold two markers.
+        HashSet<int> distinct = new HashSet<int>(slots);
+        Assert.That(distinct.Count, Is.EqualTo(slots.Count));
     }
 
     // ------------------------------------------------------------------ guidance helpers

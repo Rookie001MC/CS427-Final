@@ -10,13 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b1558b53b677d6d41b5cdbda8724d152, type: 3}
-  m_Name: Level01_IndustrialParkour
+  m_Name: Level03_SkyboundCity
   m_EditorClassIdentifier: Assembly-CSharp::LevelEntry
-  sceneName: IndustrialParkour
-  levelNumber: 1
-  displayName: INDUSTRIAL PARKOUR
-  subtitle: Industrial Zone  -  Stage 01
-  track: 0
-  recordKey: IndustrialParkour
-  preview: {fileID: 2800000, guid: 4df1837e8ff55fd49af006a66f14b261, type: 3}
-  tip: Sprint before the crane-yard gaps - the long hops need the run-up.
+  sceneName: SkyboundCity
+  levelNumber: 3
+  displayName: SKYBOUND CITY
+  subtitle: Six Districts  -  The Main Run
+  track: 1
+  recordKey: SkyboundCity
+  preview: {fileID: 0}
+  tip: Five relays, any order, then the tower. Follow the chevrons and keep your speed
+    through the corners.

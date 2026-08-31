@@ -37,6 +37,22 @@ public sealed class GameManager : MonoBehaviour
     public RunTimer Timer => runTimer;
     public CheckpointManager Checkpoints => checkpoints;
 
+    /// <summary>
+    /// Whether anything in the scene is going to offer the player the choice that No-Checkpoint
+    /// Mode's death is supposed to end in.
+    ///
+    /// This exists because the mode was only half implemented. `Die` reads the rules correctly and
+    /// takes the right branch, but the No-Checkpoint branch does not resolve the death - it stops
+    /// the clock and waits for a view to call `RestartRun`. In a scene that carries a
+    /// `GameplayUIController` that is exactly right. In one that does not - Skybound City, which is
+    /// the level PLAY launches - there is nobody to ask, so the run sat in
+    /// <see cref="RunState.Recovering"/> for ever and the mode had no effect a player could see.
+    ///
+    /// A rule the scene has to opt into is not a rule. The manager now knows whether the question
+    /// can be asked, and honours the mode either way.
+    /// </summary>
+    public bool CanPresentDeathDecision => decisionResponders > 0;
+
     public event Action<RunState> StateChanged;
 
     /// <summary>Countdown label: "3", "2", "1", then "GO!".</summary>
@@ -55,6 +71,17 @@ public sealed class GameManager : MonoBehaviour
 
     private Coroutine countdownRoutine;
     private Coroutine recoveryRoutine;
+    private int decisionResponders;
+
+    /// <summary>
+    /// Registers something that will present the No-Checkpoint death decision - in practice
+    /// <see cref="GameplayUIController"/>, when it has a death overlay with a retry button on it.
+    /// Counted rather than a flag so a view being disabled and re-enabled cannot lose it.
+    /// </summary>
+    public void AddDeathDecisionResponder() => decisionResponders++;
+
+    public void RemoveDeathDecisionResponder()
+        => decisionResponders = Mathf.Max(0, decisionResponders - 1);
 
     private void OnEnable()
     {
@@ -214,6 +241,13 @@ public sealed class GameManager : MonoBehaviour
 
         bool awaitsDecision = Rules.DeathAction == DeathRecoveryAction.AwaitPlayerDecision;
 
+        // The attempt is over either way in No-Checkpoint Mode; the only question is whether the
+        // player gets to choose what happens next or the manager has to decide for them. The rule
+        // the mode is written to - death resets the whole run: timer, progress and countdown - is
+        // the manager's, so it holds in a scene with no death overlay too. Falling back to the
+        // checkpoint respawn there is what made the two modes indistinguishable.
+        bool asksThePlayer = awaitsDecision && CanPresentDeathDecision;
+
         if (runTimer != null && awaitsDecision)
         {
             runTimer.Stop();
@@ -223,20 +257,43 @@ public sealed class GameManager : MonoBehaviour
         {
             player.Freeze(!awaitsDecision);
 
-            if (awaitsDecision)
+            if (asksThePlayer)
             {
                 player.ReleaseCursor();
             }
         }
 
-        Debug.Log($"[Run] death #{Deaths} - {reason}.", this);
+        Debug.Log($"[Run] death #{Deaths} - {reason} ({Rules.DisplayName}).", this);
         PlayerDied?.Invoke(Deaths);
+
         if (!awaitsDecision)
         {
             recoveryRoutine = StartCoroutine(RecoverAfterDeath());
         }
+        else if (!asksThePlayer)
+        {
+            recoveryRoutine = StartCoroutine(FailRunAfterDeath());
+        }
 
         return true;
+    }
+
+    /// <summary>
+    /// No-Checkpoint Mode with nobody to ask: the attempt ends and the whole run starts again,
+    /// which is the mode's own rule rather than a fallback invented here. The pause is the same
+    /// length as Checkpoint Mode's recovery so the death still reads as a beat rather than a
+    /// teleport.
+    /// </summary>
+    private IEnumerator FailRunAfterDeath()
+    {
+        for (int remaining = CheckpointRecoverySeconds; remaining >= 1; remaining--)
+        {
+            RecoveryCountdownTick?.Invoke(remaining);
+            yield return new WaitForSecondsRealtime(1f);
+        }
+
+        recoveryRoutine = null;
+        RestartRun();
     }
 
     private IEnumerator RecoverAfterDeath()

@@ -9,11 +9,21 @@ public sealed class MenuVisualController : MonoBehaviour
     public enum Screen
     {
         Main,
-        LevelSelect
+
+        /// <summary>
+        /// The main run, on its own, as a hero panel. It is a separate screen rather than the first
+        /// card of a list because the game has one real run and two practice courses, and a list of
+        /// three equal cards is a menu that says the opposite.
+        /// </summary>
+        MainRun,
+
+        /// <summary>The practice courses, grouped and labelled as such.</summary>
+        Training
     }
 
     [SerializeField] private UIPanel mainPanel;
-    [SerializeField] private UIPanel levelSelectPanel;
+    [SerializeField] private UIPanel mainRunPanel;
+    [SerializeField] private UIPanel trainingPanel;
 
     public Screen Current { get; private set; } = Screen.Main;
 
@@ -22,53 +32,41 @@ public sealed class MenuVisualController : MonoBehaviour
 
     private void Awake()
     {
-        // Both panels start hidden; Show() drives the first transition so the fade always runs.
-        if (mainPanel != null)
-        {
-            mainPanel.ApplyImmediate(false);
-        }
-
-        if (levelSelectPanel != null)
-        {
-            levelSelectPanel.ApplyImmediate(false);
-        }
+        // Every panel starts hidden; Show() drives the first transition so the fade always runs.
+        Apply(mainPanel, false, true);
+        Apply(mainRunPanel, false, true);
+        Apply(trainingPanel, false, true);
     }
 
     public void Show(Screen screen, bool immediate = false)
     {
         Current = screen;
 
-        UIPanel target = screen == Screen.Main ? mainPanel : levelSelectPanel;
-        UIPanel other = screen == Screen.Main ? levelSelectPanel : mainPanel;
-
-        if (other != null)
-        {
-            if (immediate)
-            {
-                other.ApplyImmediate(false);
-            }
-            else
-            {
-                other.SetVisible(false);
-            }
-        }
-
-        if (target != null)
-        {
-            if (immediate)
-            {
-                target.ApplyImmediate(true);
-            }
-            else
-            {
-                target.SetVisible(true);
-            }
-        }
+        Apply(mainPanel, screen == Screen.Main, immediate);
+        Apply(mainRunPanel, screen == Screen.MainRun, immediate);
+        Apply(trainingPanel, screen == Screen.Training, immediate);
 
         ScreenChanged?.Invoke(screen);
     }
 
-    /// <summary>Escape / Back behaviour: Level Select falls back to the main screen.</summary>
+    private static void Apply(UIPanel panel, bool visible, bool immediate)
+    {
+        if (panel == null)
+        {
+            return;
+        }
+
+        if (immediate)
+        {
+            panel.ApplyImmediate(visible);
+        }
+        else
+        {
+            panel.SetVisible(visible);
+        }
+    }
+
+    /// <summary>Escape / Back behaviour: every other screen falls back to the main one.</summary>
     public bool TryGoBack()
     {
         if (Current == Screen.Main)

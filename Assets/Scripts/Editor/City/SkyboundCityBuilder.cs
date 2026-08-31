@@ -36,7 +36,6 @@ using UnityEngine.UI;
 /// mission HUD that looks like the rest of the game's UI instead of like a debug readout.
 ///
 /// What the builder deliberately does NOT do, so it is clear the omissions are scope and not misses:
-///   - no LevelEntry asset, no build-settings registration, no menu card  (Phase 6F)
 ///   - no full gameplay UI: pause, countdown, death and complete panels   (Phase 6F)
 ///   - no occlusion or lighting bake                                      (Phase 6G)
 ///
@@ -49,6 +48,9 @@ using UnityEngine.UI;
 public static class SkyboundCityBuilder
 {
     public const string ScenePath = "Assets/Scenes/SkyboundCity.unity";
+
+    /// <summary>The catalogue asset the menu and this scene both describe the level from.</summary>
+    public const string LevelEntryPath = "Assets/Data/Level03_SkyboundCity.asset";
 
     private static Material mGround;
     private static Material mAvenue;
@@ -948,6 +950,27 @@ public static class SkyboundCityBuilder
         FallImpactDetector impact = systems.AddComponent<FallImpactDetector>();
         ObjectiveTracker tracker = systems.AddComponent<ObjectiveTracker>();
         GameManager game = systems.AddComponent<GameManager>();
+
+        // Who this level is, for the menu, the loading screen and the record store. It is the same
+        // `LevelEntry` asset the menu's PLAY screen reads, so the level and the menu can never
+        // disagree about its name or which records are its own - and `LevelInfo.RecordKey` falls
+        // back to the scene name, so a missing asset degrades to correct-but-unnamed rather than to
+        // records shared with another level.
+        LevelInfo info = systems.AddComponent<LevelInfo>();
+        LevelEntry entry = AssetDatabase.LoadAssetAtPath<LevelEntry>(LevelEntryPath);
+
+        if (entry == null)
+        {
+            Debug.LogWarning($"[SkyboundCity] {LevelEntryPath} is missing, so the level will be " +
+                             "named after its scene rather than after the catalogue.");
+        }
+
+        SerializedObject li = new SerializedObject(info);
+        li.FindProperty("entry").objectReferenceValue = entry;
+        li.FindProperty("displayName").stringValue = "SKYBOUND CITY";
+        li.FindProperty("subtitle").stringValue = "Six Districts  -  The Main Run";
+        li.FindProperty("recordKey").stringValue = "SkyboundCity";
+        li.ApplyModifiedPropertiesWithoutUndo();
 
         SerializedObject cm = new SerializedObject(checkpoints);
         SerializedProperty list = cm.FindProperty("checkpoints");

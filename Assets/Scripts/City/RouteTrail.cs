@@ -32,7 +32,6 @@ using UnityEngine;
 public sealed class RouteTrail
 {
     private readonly CityNavGraph graph;
-    private readonly int budget;
 
     private readonly List<Vector3> polyline = new List<Vector3>();
     private readonly List<NavMove> moves = new List<NavMove>();
@@ -48,17 +47,31 @@ public sealed class RouteTrail
 
     private Vector3 destination;
 
-    // The arc position the markers were last laid from. Remembered because "the trail is
-    // short" and "the route has no more to give" look identical from the outside, and a
-    // player standing on the objective is in the second case on every frame of the rest of
-    // the run.
-    private float laidFrom = float.NaN;
+    // What the last search was asked. `Path` is deterministic and `Waypoints` is a pure function of
+    // it, the node it starts from and the destination, so a search with all four of these unchanged
+    // is provably the search that produced the route already being drawn. Remembering them is not a
+    // throttle - there is no time in it - it is the observation that the answer cannot have moved.
+    private int searchedFrom = -1;
+    private int searchedTo = -1;
+    private string searchedTarget;
+    private Vector3 searchedDestination;
+    private bool searchedProducedThis;
 
+    /// <param name="budget">
+    /// How many markers the view can draw at once, pool plus spare. Kept as a property rather than
+    /// a cap: the trail lays the whole route, once, so that a marker is a thing with a lifetime that
+    /// the pool can bind an object to - laying only the budget's worth from wherever the player had
+    /// got to made the set of markers in existence a function of the player, which is what the pool
+    /// then had to churn to keep up with.
+    /// </param>
     public RouteTrail(CityNavGraph graph, int budget)
     {
         this.graph = graph;
-        this.budget = budget;
+        Budget = budget;
     }
+
+    /// <summary>How many markers the view can draw at once.</summary>
+    public int Budget { get; }
 
     /// <summary>The objective the trail currently leads to, or empty.</summary>
     public string Target { get; private set; } = string.Empty;
@@ -114,7 +127,7 @@ public sealed class RouteTrail
             Along = CityNavigation.Advance(polyline, at, Along, CityDesign.GuideProjectionWindow);
         }
 
-        if (NeedsSearch(at, targetId))
+        if (NeedsSearch(at, targetId, targetNode, destination))
         {
             Search(at, targetId, targetNode, destination);
         }
@@ -122,8 +135,6 @@ public sealed class RouteTrail
         {
             Reanchor(at);
         }
-
-        Lay();
     }
 
     /// <summary>Nothing to draw: no objective, or the guide has been switched off.</summary>
@@ -135,8 +146,8 @@ public sealed class RouteTrail
         routeNodes.Clear();
         HasRoute = false;
         Along = 0f;
-        laidFrom = float.NaN;
         Target = string.Empty;
+        searchedProducedThis = false;
     }
 
     /// <summary>
@@ -158,6 +169,7 @@ public sealed class RouteTrail
         }
 
         float lead = Along + CityDesign.GuideTrailLead;
+        float ceiling = Along + CityDesign.GuideVisibleRange;
 
         for (int i = 0; i < crumbs.Count; i++)
         {
@@ -168,22 +180,39 @@ public sealed class RouteTrail
 
             Breadcrumb crumb = crumbs[i];
 
-            if (crumb.Along < lead)
+            if (crumb.Along < lead || crumb.Along > ceiling)
             {
+                continue;
+            }
+
+            // An upright marker wherever the route stops being a run. This is the difference
+            // between "that way" and "climb this": the chevrons lead to the foot of the fire
+            // escape, and one of these is standing on it.
+            //
+            // And it is the *only* marker on that spot. Both pools used to be given the crumb, so
+            // a three-metre post with its own arrowhead on top was stood through the middle of a
+            // flat chevron lying on the ground - two solids sharing the same origin, which is a
+            // z-fight, which is the thing that flickers as the camera turns. Eighteen of the
+            // city's 321 markers were built that way, and three of them were on screen for a
+            // player standing perfectly still.
+            if (crumb.Move != NavMove.Walk && crumb.IsTransition)
+            {
+                // Always an upright marker, and never anything else. Falling back to a chevron when
+                // the upright pool is full would make what a marker *is* a function of how many
+                // transitions happen to be in the window, so running past one two hundred metres
+                // back would turn a chevron into a post. The transitions fill the pool in arc
+                // order, so the ones the player is about to reach are the ones that get an object.
+                if (actions.Count < actionPool)
+                {
+                    actions.Add(crumb);
+                }
+
                 continue;
             }
 
             if (chevrons.Count < markerPool)
             {
                 chevrons.Add(crumb);
-            }
-
-            // An upright marker wherever the route stops being a run. This is the difference
-            // between "that way" and "climb this": the chevrons lead to the foot of the fire
-            // escape, and one of these is standing on it.
-            if (crumb.Move != NavMove.Walk && crumb.IsTransition && actions.Count < actionPool)
-            {
-                actions.Add(crumb);
             }
         }
     }
@@ -207,13 +236,38 @@ public sealed class RouteTrail
     ///   a node the route never lists. Without this clause that re-searched three times over a
     ///   285 m route, and a re-search re-anchors every marker at once.
     /// </summary>
-    private bool NeedsSearch(Vector3 at, string targetId)
+    private bool NeedsSearch(Vector3 at, string targetId, int targetNode, Vector3 to)
     {
         if (targetId != Target || !HasRoute)
         {
             return true;
         }
 
+        if (!WantsSearch(at, targetId))
+        {
+            return false;
+        }
+
+        // It wants one. Whether running it could tell it anything it does not already know is a
+        // different question, and the answer is arithmetic rather than judgement: a search is
+        // `Path(StandingOn, targetNode)` turned into waypoints ending at `to`, all four of which
+        // are here. If the last search was asked exactly this and the route it returned is the one
+        // being drawn, this search returns that route again.
+        //
+        // The case it exists for is not an optimisation. A player standing near the objective is
+        // past the end of their route and more than `GuideRecomputeDistance` from the pad, which is
+        // the clause above, on every frame - 938 Dijkstras in 1200 frames of walking a circle round
+        // a captured relay - and every one of them found the same route it already had.
+        return !(searchedProducedThis && searchedFrom == StandingOn && searchedTo == targetNode
+                 && searchedTarget == targetId
+                 && (searchedDestination - to).sqrMagnitude < 0.0001f);
+    }
+
+    /// <summary>
+    /// Whether the player has left the route, which is the only thing that can make it wrong.
+    /// </summary>
+    private bool WantsSearch(Vector3 at, string targetId)
+    {
         // Run out of route - but only worth re-finding if there is still somewhere to go. A player
         // standing on the objective has reached the end of the route legitimately, and re-searching
         // it every frame would be a Dijkstra per frame for a trail with nothing left to draw.
@@ -228,7 +282,11 @@ public sealed class RouteTrail
             return false;
         }
 
-        return DistanceToRoute(at) > CityDesign.GuideRecomputeDistance;
+        // Measured against the whole drawn line rather than only against the point the player has
+        // got to. Those differ for a player who has cut a corner or is running one leg of a route
+        // that doubles back, and the strict reading called that "off the route" - which is a fresh
+        // Dijkstra and a re-anchored trail for a player who is standing on the chevrons.
+        return NearestOnRoute(at) > CityDesign.GuideRecomputeDistance;
     }
 
     /// <summary>
@@ -288,10 +346,17 @@ public sealed class RouteTrail
 
         int from = StandingOn;
 
+        searchedFrom = from;
+        searchedTo = targetNode;
+        searchedTarget = targetId;
+        searchedDestination = destination;
+        searchedProducedThis = false;
+
         if (targetNode < 0 || from < 0)
         {
             Clear();
             Target = targetId;
+            searchedTarget = targetId;
             return;
         }
 
@@ -304,6 +369,7 @@ public sealed class RouteTrail
             // here would be the exact failure this component exists to fix.
             Clear();
             Target = targetId;
+            searchedTarget = targetId;
             return;
         }
 
@@ -313,6 +379,7 @@ public sealed class RouteTrail
 
         if (sameObjective && HasRoute && Same(candidate, polyline))
         {
+            searchedProducedThis = true;
             return;
         }
 
@@ -330,8 +397,15 @@ public sealed class RouteTrail
         }
 
         HasRoute = true;
-        crumbs.Clear();
-        laidFrom = float.NaN;
+        searchedProducedThis = true;
+
+        // The markers, once, for the whole route. Not for the visible window and not from where the
+        // player has got to: a marker is a thing that exists as long as the route does, so the pool
+        // can bind an object to it and leave that object alone. Laying the window instead made the
+        // set of markers in existence a function of the player, which is why every chevron on
+        // screen was reassigned to a different pool object 513 times over a 400 m run.
+        Lays++;
+        CityNavigation.LayRoute(polyline, moves, crumbs);
 
         // Re-projecting rather than resetting: if this was a re-search of the same objective the
         // player has not gone back to the beginning, and starting the arc at zero would make the
@@ -342,45 +416,37 @@ public sealed class RouteTrail
     }
 
     /// <summary>
-    /// Lays the markers out over what is left of the route, and only when what is drawn has
-    /// actually run short.
+    /// How far the player is from the nearest point of the drawn route, anywhere along it.
     ///
-    /// The second half of that is not an optimisation. The old condition asked whether the trail
-    /// reached half the visible range ahead of the player and nothing else, so a player within
-    /// 85 m of the end of their route re-laid a trail that could not grow, every frame, for the
-    /// rest of the run.
+    /// Only ever a gate on "have they left the route". Nothing reads it to decide *where* on the
+    /// route they are - that is <see cref="CityNavigation.Advance"/>, which is windowed precisely
+    /// so it cannot teleport across a route that passes near itself.
     /// </summary>
-    private void Lay()
+    private float NearestOnRoute(Vector3 at)
     {
-        if (!HasRoute)
-        {
-            crumbs.Clear();
-            laidFrom = float.NaN;
-            return;
-        }
+        float best = float.MaxValue;
 
-        if (crumbs.Count > 0)
+        for (int i = 0; i < polyline.Count - 1; i++)
         {
-            float drawn = crumbs[crumbs.Count - 1].Along;
+            Vector3 from = polyline[i];
+            Vector3 step = polyline[i + 1] - from;
+            float length = step.magnitude;
 
-            if (drawn >= Along + CityDesign.GuideVisibleRange * 0.5f
-                || drawn >= Length - CityDesign.GuideBreadcrumbSpacing)
+            if (length < 0.001f)
             {
-                return;
+                continue;
+            }
+
+            float t = Mathf.Clamp01(Vector3.Dot(at - from, step) / (length * length));
+            float distance = (from + step * t - at).sqrMagnitude;
+
+            if (distance < best)
+            {
+                best = distance;
             }
         }
-        else if (laidFrom == Along)
-        {
-            // Laid from exactly here already, and the route had nothing to give. It still has
-            // nothing to give: the answer is a function of the route and this number, and neither
-            // has moved. A player who has arrived stands on the objective for the rest of the run,
-            // and without this that is an empty list rebuilt sixty times a second, for ever.
-            return;
-        }
 
-        Lays++;
-        laidFrom = Along;
-        CityNavigation.Breadcrumbs(polyline, moves, budget, Along, crumbs);
+        return best == float.MaxValue ? 0f : Mathf.Sqrt(best);
     }
 
     /// <summary>How far the player is from the point on the route they have got to.</summary>

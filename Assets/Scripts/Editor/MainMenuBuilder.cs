@@ -49,22 +49,35 @@ public static class MainMenuBuilder
         MenuVisualController visuals = root.gameObject.AddComponent<MenuVisualController>();
         MenuController controller = root.gameObject.AddComponent<MenuController>();
 
-        MainRefs main = BuildMainPanel(root, out UIPanel mainPanel);
-        SelectRefs select = BuildLevelSelectPanel(root, levels.Count, out UIPanel selectPanel);
+        LevelEntry mainRun = levels.Find(l => l != null && l.IsMainRun);
+        int trainingCount = levels.FindAll(l => l != null && !l.IsMainRun).Count;
+
+        if (mainRun == null)
+        {
+            Debug.LogWarning("[Menu] No LevelEntry is marked as the main run: the PLAY screen " +
+                             "will build, but it will have nothing to launch.");
+        }
+
+        MainRefs main = BuildMainPanel(root, mainRun, out UIPanel mainPanel);
+        HeroRefs hero = BuildMainRunPanel(root, mainRun, out UIPanel heroPanel);
+        SelectRefs select = BuildTrainingPanel(root, trainingCount, out UIPanel trainingPanel);
         ModeSelectionView modeSelection = BuildModeSelectionModal(root);
         SceneLoader loader = BuildLoadingOverlay();
 
         SetRef(visuals, "mainPanel", mainPanel);
-        SetRef(visuals, "levelSelectPanel", selectPanel);
+        SetRef(visuals, "mainRunPanel", heroPanel);
+        SetRef(visuals, "trainingPanel", trainingPanel);
 
         SetRef(controller, "visuals", visuals);
         SetRef(controller, "loader", loader);
         SetRef(controller, "modeSelection", modeSelection);
         SetRef(controller, "playButton", main.Play);
-        SetRef(controller, "levelsButton", main.Levels);
+        SetRef(controller, "trainingButton", main.Training);
         SetRef(controller, "statsButton", main.Stats);
         SetRef(controller, "quitButton", main.Quit);
         SetRef(controller, "currentZoneValue", main.CurrentZone);
+        SetRef(controller, "featured", hero.View);
+        SetRef(controller, "mainRunBackButton", hero.Back);
         SetRef(controller, "backButton", select.Back);
         SetRef(controller, "clearedValue", select.Cleared);
         SetList(controller, "levels", levels.ConvertAll(l => (Object)l));
@@ -72,7 +85,9 @@ public static class MainMenuBuilder
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.Refresh();
-        Debug.Log($"[Menu] MainMenu built with {levels.Count} level(s) at {ScenePath}");
+        Debug.Log($"[Menu] MainMenu built: main run " +
+                  $"{(mainRun != null ? mainRun.DisplayName : "<none>")}, " +
+                  $"{trainingCount} training course(s), {levels.Count} level(s) at {ScenePath}");
     }
 
     private static List<LevelEntry> LoadLevels()
@@ -135,11 +150,18 @@ public static class MainMenuBuilder
 
     private struct MainRefs
     {
-        public Button Play, Levels, Stats, Quit;
+        public Button Play, Training, Stats, Quit;
         public TMP_Text CurrentZone;
     }
 
-    private static MainRefs BuildMainPanel(RectTransform root, out UIPanel panel)
+    private struct HeroRefs
+    {
+        public FeaturedLevelView View;
+        public Button Back;
+    }
+
+    private static MainRefs BuildMainPanel(RectTransform root, LevelEntry mainRun,
+        out UIPanel panel)
     {
         RectTransform layer = Layer(root, "MainPanel", out panel);
 
@@ -167,46 +189,61 @@ public static class MainMenuBuilder
 
         // ---- identity block
         TopLeft(Text(layer, "Eyebrow", "URBAN VELOCITY", UITheme.Eyebrow, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
-            64f, 88f, 900f, 40f);
+            64f, 64f, 900f, 40f);
 
         // Two lines, white over cyan, inside the 810-wide left column. The mockup's wordmark is
         // 145px of cap height on a 1998px-wide frame - roughly 196pt in canvas units for the
         // three-letter "VER". "SKYBOUND" is eight caps, so it takes the largest size that still
         // clears the column: 8 chars x (0.462em advance + 0.02em tracking) x 172 = 663 of 750.
         TopLeft(Text(layer, "TitleTop", "SKYBOUND", UITheme.TitleHero, UITheme.White, TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold, UIFontRole.Display),
-            60f, 132f, 760f, 220f);
+            60f, 106f, 760f, 220f);
         TopLeft(Text(layer, "TitleBottom", "TRIALS", UITheme.TitleHero, UITheme.CyanBright, TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold, UIFontRole.Display),
-            60f, 132f + UITheme.TitleHero * UITheme.DisplayLineStep, 760f, 220f);
+            60f, 106f + UITheme.TitleHero * UITheme.DisplayLineStep, 760f, 220f);
 
+        // The wordmark ends at 106 + 137 + a 120-unit cap = 363. The rule sits a section below it
+        // and the tagline a heading-gap under that, which leaves the four menu rows a clear
+        // 130 units of air instead of butting into the tagline's descenders.
         Image rule = Img(layer, "Rule", new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.35f));
-        TopLeft((RectTransform)rule.transform, 64f, 470f, 690f, 1f);
+        TopLeft((RectTransform)rule.transform, 64f, 408f, 690f, 1f);
 
-        TopLeft(Text(layer, "Tagline", "Run beyond your limit.", UITheme.Body, UITheme.Label, TextAlignmentOptions.TopLeft, 2f),
-            64f, 494f, 700f, 40f);
+        TMP_Text tagline = Text(layer, "Tagline", "Run beyond your limit.", UITheme.Body, UITheme.Label, TextAlignmentOptions.TopLeft, 2f);
+        TopLeft(tagline, 64f, 408f + UITheme.HeadingGap, 700f, 44f);
 
         // ---- menu rows
         // Anchored to the bottom, not the top: on wider-than-16:9 viewports the canvas is shorter
         // than 1080 reference units, and a top-anchored stack clips its last row off-screen.
+        // PLAY names the main run in its caption and TRAINING says what it is, so the split
+        // between the game and its practice courses is legible before anything is clicked.
         MainRefs refs = new MainRefs();
-        refs.Play = MenuRow(layer, "PlayRow", "PLAY", "CONTINUE RUN", 450f, UITheme.CyanBright);
-        refs.Levels = MenuRow(layer, "LevelsRow", "LEVELS", "SELECT STAGE", 330f, UITheme.Cyan);
-        refs.Stats = MenuRow(layer, "StatsRow", "STATS", "RUNNER PROFILE", 210f, UITheme.Cyan);
-        refs.Quit = MenuRow(layer, "QuitRow", "QUIT", "EXIT TO DESKTOP", 90f, UITheme.Orange);
+        // 112-tall rows on a 132 pitch: a 20-unit gutter, where they used to sit 8 apart and read
+        // as one block of stacked type with hairlines through it.
+        const float rowPitch = 112f + UITheme.RowGutter;
+        const float firstRow = 72f;
+
+        refs.Play = MenuRow(layer, "PlayRow", "PLAY",
+            mainRun != null ? mainRun.DisplayName : "MAIN RUN", firstRow + rowPitch * 3f,
+            UITheme.CyanBright, true);
+        refs.Training = MenuRow(layer, "TrainingRow", "TRAINING", "PRACTICE COURSES",
+            firstRow + rowPitch * 2f, UITheme.Orange);
+        refs.Stats = MenuRow(layer, "StatsRow", "STATS", "RUNNER PROFILE",
+            firstRow + rowPitch, UITheme.Cyan);
+        refs.Quit = MenuRow(layer, "QuitRow", "QUIT", "EXIT TO DESKTOP", firstRow, UITheme.Orange);
 
         // ---- current zone, bottom right over the photo
-        RectTransform zone = Block(layer, "CurrentZone", new Vector2(1f, 0f), new Vector2(-64f, 64f), new Vector2(760f, 124f));
+        RectTransform zone = Block(layer, "CurrentZone", new Vector2(1f, 0f), new Vector2(-64f, 72f), new Vector2(760f, 140f));
         zone.pivot = new Vector2(1f, 0f);
         TMP_Text zoneLabel = Text(zone, "Label", "CURRENT ZONE", UITheme.StatLabel, UITheme.Cyan, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
         Anchor((RectTransform)zoneLabel.transform, new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(760f, 34f));
         refs.CurrentZone = Text(zone, "Value", "-", UITheme.StatValueLarge, UITheme.White, TextAlignmentOptions.Right, 0f, FontStyles.Bold, UIFontRole.Display);
-        Anchor((RectTransform)refs.CurrentZone.transform, new Vector2(1f, 1f), new Vector2(0f, -36f), new Vector2(760f, 76f));
+        Anchor((RectTransform)refs.CurrentZone.transform, new Vector2(1f, 1f), new Vector2(0f, -46f), new Vector2(760f, 84f));
         AutoSize(refs.CurrentZone, UITheme.StatValueLarge * 0.62f, UITheme.StatValueLarge);
 
         return refs;
     }
 
     /// <summary>Big label + small caption row with a left accent bar, as in the mockup.</summary>
-    private static Button MenuRow(RectTransform parent, string name, string label, string caption, float bottom, Color accent)
+    private static Button MenuRow(RectTransform parent, string name, string label, string caption,
+        float bottom, Color accent, bool primary = false)
     {
         // 112 tall, not 100: the mockup sets these labels at ~103pt of cap height and a 100-unit
         // row would clip the descender-free caps against the accent bar's own edge.
@@ -217,8 +254,24 @@ public static class MainMenuBuilder
         Stretch((RectTransform)fill.transform);
         fill.raycastTarget = true;
 
+        // The row that launches the game gets a standing cyan bar and a cyan wash. Both are drawn
+        // *behind* the pieces `MenuButtonVisual` animates and are not referenced by it, because it
+        // rebuilds the fill and border colours from its own palette on Awake - a hand-set colour on
+        // either of those is a colour that lasts until the first frame.
+        if (primary)
+        {
+            Image wash = Img(rt, "PrimaryWash", new Color(UITheme.Cyan.r, UITheme.Cyan.g,
+                UITheme.Cyan.b, 0.10f));
+            Stretch((RectTransform)wash.transform);
+
+            Image standing = Img(rt, "PrimaryBar", UITheme.CyanBright);
+            Anchor((RectTransform)standing.transform, new Vector2(0f, 0.5f), Vector2.zero,
+                new Vector2(8f, rowH));
+        }
+
         Image bar = Img(rt, "Accent", accent);
-        Anchor((RectTransform)bar.transform, new Vector2(0f, 0.5f), Vector2.zero, new Vector2(4f, rowH));
+        Anchor((RectTransform)bar.transform, new Vector2(0f, 0.5f), Vector2.zero,
+            new Vector2(4f, rowH));
 
         Image edge = Img(rt, "Edge", new Color(1f, 1f, 1f, 0.05f));
         Anchor((RectTransform)edge.transform, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(700f, 1f));
@@ -226,8 +279,12 @@ public static class MainMenuBuilder
         TMP_Text big = Text(rt, "Label", label, UITheme.MenuRow, UITheme.White, TextAlignmentOptions.Left, UITheme.DisplaySpacing, FontStyles.Bold, UIFontRole.Display);
         Anchor((RectTransform)big.transform, new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(380f, 128f));
 
-        TMP_Text small = Text(rt, "Caption", caption, UITheme.Caption, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)small.transform, new Vector2(1f, 0.5f), new Vector2(-32f, 0f), new Vector2(300f, 34f));
+        TMP_Text small = Text(rt, "Caption", caption, UITheme.Caption,
+            primary ? UITheme.CyanBright : UITheme.Label, TextAlignmentOptions.Right,
+            UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
+        Anchor((RectTransform)small.transform, new Vector2(1f, 0.5f), new Vector2(-32f, 0f),
+            new Vector2(320f, 34f));
+        AutoSize(small, UITheme.MinimumSize, UITheme.Caption);
 
         Button button = rt.gameObject.AddComponent<Button>();
         button.targetGraphic = fill;
@@ -243,7 +300,216 @@ public static class MainMenuBuilder
         return button;
     }
 
-    // ------------------------------------------------------------------ level select
+    // ------------------------------------------------------------------ main run
+
+    /// <summary>
+    /// The main run, given a whole screen.
+    ///
+    /// This is the answer to "the menu presents three equivalent levels": it does not present them
+    /// at all any more. PLAY opens this, one level fills the frame at title size against its own
+    /// skyline, and the only control on it is START RUN. The two practice courses are a screen of
+    /// their own, reached by a row that says TRAINING.
+    ///
+    /// Built from the same primitives, palette and type scale as everything else here, so it reads
+    /// as the same game: dark ground, one cyan accent, condensed display caps for the name, mono
+    /// for the labels, and the same outline hover the rest of the menu uses.
+    /// </summary>
+    private static HeroRefs BuildMainRunPanel(RectTransform root, LevelEntry mainRun,
+        out UIPanel panel)
+    {
+        RectTransform layer = Layer(root, "MainRunPanel", out panel);
+
+        Image bg = Img(layer, "Background", new Color(0.024f, 0.028f, 0.035f, 1f));
+        Stretch((RectTransform)bg.transform);
+
+        // The city itself behind the copy, washed back far enough for 24pt mono to stay legible on
+        // top of it. The level's own preview when it has one, the menu backdrop when it does not.
+        RawImage shot = Raw(layer, "Backdrop", PreviewFolder + "MenuBackdrop.png");
+        Stretch((RectTransform)shot.transform);
+        shot.color = new Color(1f, 1f, 1f, 0.55f);
+
+        Image wash = Img(layer, "BackdropWash", new Color(0.02f, 0.025f, 0.032f, 0.62f));
+        Stretch((RectTransform)wash.transform);
+
+        // A left column so the copy always sits on solid ground whatever the photo is doing.
+        Image column = Img(layer, "LeftColumn", new Color(0.027f, 0.031f, 0.039f, 0.94f));
+        RectTransform columnRt = (RectTransform)column.transform;
+        columnRt.anchorMin = new Vector2(0f, 0f);
+        columnRt.anchorMax = new Vector2(0f, 1f);
+        columnRt.pivot = new Vector2(0f, 0.5f);
+        columnRt.anchoredPosition = Vector2.zero;
+        columnRt.sizeDelta = new Vector2(1080f, 0f);
+
+        RawImage fade = Raw(layer, "ColumnFade", PreviewFolder + "FadeGradient.png");
+        RectTransform fadeRt = (RectTransform)fade.transform;
+        fadeRt.anchorMin = new Vector2(0f, 0f);
+        fadeRt.anchorMax = new Vector2(0f, 1f);
+        fadeRt.pivot = new Vector2(0f, 0.5f);
+        fadeRt.anchoredPosition = new Vector2(1080f, 0f);
+        fadeRt.sizeDelta = new Vector2(300f, 0f);
+
+        // ---- the badge that says what this screen is
+        Image badge = Img(layer, "TrackBadge", UITheme.CyanBright);
+        TopLeft((RectTransform)badge.transform, 64f, 96f, 6f, 32f);
+
+        TMP_Text track = Text(layer, "TrackLabel", "MAIN RUN", UITheme.Eyebrow, UITheme.CyanBright,
+            TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
+        TopLeft(track, 86f, 88f, 700f, 40f);
+
+        TMP_Text number = Text(layer, "LevelNumber", "LEVEL 03", UITheme.LabelSmall, UITheme.Label,
+            TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
+        TopLeft(number, 86f, 140f, 500f, 34f);
+
+        // ---- the name, at hero size. Two lines so a long one never has to shrink to nothing.
+        TMP_Text title = Text(layer, "Title", "SKYBOUND CITY", UITheme.TitleHuge, UITheme.White,
+            TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold,
+            UIFontRole.Display);
+        TopLeft(title, 60f, 190f, 1000f, 200f);
+        Prose(title);
+        AutoSize(title, UITheme.TitleMedium * 0.6f, UITheme.TitleHuge);
+
+        // Everything below the name is spaced on the same two gaps: a section between blocks, a
+        // heading gap between a label and the thing it labels. The screen had them all at 26 to 50
+        // units of a mixture, which is what read as lines running into each other.
+        const float ruleY = 400f;
+        const float subtitleY = ruleY + UITheme.HeadingGap;
+        const float pitchY = subtitleY + 48f + UITheme.SectionGap;
+        const float statsY = pitchY + 92f + UITheme.SectionGap;
+        const float tipY = statsY + 96f + UITheme.SectionGap;
+
+        Image rule = Img(layer, "Rule", new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.35f));
+        TopLeft((RectTransform)rule.transform, 64f, ruleY, 950f, 1f);
+
+        TMP_Text subtitle = Text(layer, "Subtitle", "", UITheme.Subtitle, UITheme.Label,
+            TextAlignmentOptions.TopLeft, 3f, fontRole: UIFontRole.Mono);
+        TopLeft(subtitle, 64f, subtitleY, 960f, 48f);
+        AutoSize(subtitle, UITheme.MinimumSize, UITheme.Subtitle);
+
+        TMP_Text pitch = Text(layer, "Pitch",
+            "The full run. Five relays across six districts, taken in any order, then the tower.",
+            UITheme.Body, UITheme.White, TextAlignmentOptions.TopLeft, 1f);
+        TopLeft(pitch, 64f, pitchY, 900f, 92f);
+        Prose(pitch);
+
+        // ---- the record strip
+        // A label and its value are one unit, so the gap inside the pair is the heading gap and
+        // the gap to the next pair is a section. 72, not 62, on the value: one line of Anton at
+        // StatValueLarge measures 69 units tall.
+        TopLeft(Text(layer, "ClearedLabel", "MODES CLEARED", UITheme.LabelSmall, UITheme.Label,
+                TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+            64f, statsY, 300f, 32f);
+        TMP_Text cleared = Text(layer, "ClearedValue", "0 / 2", UITheme.StatValueLarge, UITheme.Label,
+            TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(cleared, 64f, statsY + UITheme.HeadingGap, 300f, 76f);
+
+        TopLeft(Text(layer, "StatusLabel", "STATUS", UITheme.LabelSmall, UITheme.Label,
+                TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+            396f, statsY, 400f, 32f);
+        TMP_Text status = Text(layer, "StatusValue", "NOT YET RUN", UITheme.StatValue, UITheme.Label,
+            TextAlignmentOptions.TopLeft, 2f, FontStyles.Bold, UIFontRole.Mono);
+        TopLeft(status, 396f, statsY + UITheme.HeadingGap + 6f, 480f, 60f);
+        AutoSize(status, UITheme.MinimumSize, UITheme.StatValue);
+
+        TMP_Text tip = Text(layer, "Tip", "", UITheme.StatLabel, UITheme.Dim,
+            TextAlignmentOptions.TopLeft, 1f, fontRole: UIFontRole.Mono);
+        TopLeft(tip, 64f, tipY, 940f, 84f);
+        Prose(tip);
+
+        // ---- the preview, out on the photo side, so the screen has a subject as well as copy
+        RectTransform frame = Block(layer, "PreviewFrame", new Vector2(1f, 0.5f),
+            new Vector2(-72f, 40f), new Vector2(700f, 400f));
+        Image frameBorder = Img(frame, "Border", UITheme.PanelBorder);
+        Stretch((RectTransform)frameBorder.transform);
+        Image frameFill = Img(frame, "Fill", new Color(0.05f, 0.06f, 0.07f, 0.55f));
+        RectTransform frameFillRt = (RectTransform)frameFill.transform;
+        Stretch(frameFillRt);
+        frameFillRt.offsetMin = Vector2.one;
+        frameFillRt.offsetMax = -Vector2.one;
+
+        RawImage preview = Raw(frame, "Preview", null);
+        Stretch((RectTransform)preview.transform);
+
+        Image frameAccent = Img(frame, "Accent", UITheme.CyanBright);
+        Anchor((RectTransform)frameAccent.transform, new Vector2(0f, 1f), Vector2.zero,
+            new Vector2(96f, 4f));
+
+        // ---- the one control
+        HeroRefs refs = new HeroRefs();
+        Button start = PrimaryButton(layer, "StartRunButton", "START RUN",
+            new Vector2(64f, 72f), new Vector2(520f, 104f));
+
+        refs.Back = SmallButton(layer, "BackButton", "BACK",
+            new Vector2(64f + 520f + UITheme.RowGutter, 72f), new Vector2(240f, 104f));
+
+        FeaturedLevelView view = layer.gameObject.AddComponent<FeaturedLevelView>();
+        SetRef(view, "startButton", start);
+        SetRef(view, "preview", preview);
+        SetRef(view, "trackLabel", track);
+        SetRef(view, "numberLabel", number);
+        SetRef(view, "title", title);
+        SetRef(view, "subtitle", subtitle);
+        SetRef(view, "statusValue", status);
+        SetRef(view, "clearedValue", cleared);
+        SetRef(view, "tip", tip);
+        refs.View = view;
+
+        // Built from the asset so the scene reads correctly in the editor before it is ever run.
+        if (mainRun != null)
+        {
+            title.text = mainRun.DisplayName;
+            subtitle.text = mainRun.Subtitle;
+            number.text = mainRun.NumberLabel;
+            track.text = mainRun.TrackLabel;
+            tip.text = mainRun.Tip;
+            preview.texture = mainRun.Preview;
+            preview.enabled = mainRun.Preview != null;
+        }
+        else
+        {
+            preview.enabled = false;
+        }
+
+        return refs;
+    }
+
+    /// <summary>The one filled, cyan-on-dark call to action in the game. Used once.</summary>
+    private static Button PrimaryButton(RectTransform parent, string name, string caption,
+        Vector2 fromBottomLeft, Vector2 size)
+    {
+        RectTransform rt = Block(parent, name, new Vector2(0f, 0f), fromBottomLeft, size);
+
+        Image border = Img(rt, "Border", UITheme.CyanBright);
+        Stretch((RectTransform)border.transform);
+
+        // Solid accent with dark text: `MenuButtonVisual.Style.Primary`, which is the game's
+        // existing call-to-action treatment - the same one TRY AGAIN and REPLAY wear.
+        Image fill = Img(rt, "Fill", UITheme.CyanBright);
+        RectTransform fillRt = (RectTransform)fill.transform;
+        Stretch(fillRt);
+        fillRt.offsetMin = new Vector2(2f, 2f);
+        fillRt.offsetMax = new Vector2(-2f, -2f);
+        fill.raycastTarget = true;
+
+        TMP_Text label = Text(rt, "Label", caption, UITheme.ButtonLabel, new Color32(8, 10, 12, 255),
+            TextAlignmentOptions.Center, 6f, FontStyles.Bold, UIFontRole.Display);
+        label.textWrappingMode = TextWrappingModes.NoWrap;
+        Stretch((RectTransform)label.transform);
+
+        Button button = rt.gameObject.AddComponent<Button>();
+        button.targetGraphic = fill;
+        button.transition = Selectable.Transition.None;
+
+        MenuButtonVisual visual = rt.gameObject.AddComponent<MenuButtonVisual>();
+        SetRef(visual, "background", fill);
+        SetRef(visual, "border", border);
+        SetRef(visual, "label", label);
+        SetValue(visual, "style", (int)MenuButtonVisual.Style.Primary);
+        SetColor(visual, "accent", UITheme.CyanBright);
+
+        return button;
+    }
+
+    // ------------------------------------------------------------------ training
 
     private struct SelectRefs
     {
@@ -252,27 +518,43 @@ public static class MainMenuBuilder
         public TMP_Text Cleared;
     }
 
-    private static SelectRefs BuildLevelSelectPanel(RectTransform root, int levelCount, out UIPanel panel)
+    /// <summary>
+    /// The practice courses, grouped and labelled so they cannot be mistaken for the game.
+    ///
+    /// Same grid and the same card as before - the two maps are unchanged and so is what happens
+    /// when one is clicked - but the screen around them now says what they are for, and each card
+    /// carries a TRAINING badge of its own so the label survives a screenshot.
+    /// </summary>
+    private static SelectRefs BuildTrainingPanel(RectTransform root, int levelCount,
+        out UIPanel panel)
     {
-        RectTransform layer = Layer(root, "LevelSelectPanel", out panel);
+        RectTransform layer = Layer(root, "TrainingPanel", out panel);
 
         Image bg = Img(layer, "Background", new Color(0.027f, 0.031f, 0.039f, 0.985f));
         Stretch((RectTransform)bg.transform);
 
-        TopLeft(Text(layer, "Eyebrow", "STAGE SELECT", UITheme.Eyebrow, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
-            64f, 70f, 900f, 40f);
-        TopLeft(Text(layer, "TitleTop", "CHOOSE YOUR", UITheme.TitleMedium, UITheme.White, TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold, UIFontRole.Display),
-            60f, 112f, 1400f, 144f);
-        TopLeft(Text(layer, "TitleBottom", "DISTRICT", UITheme.TitleMedium, UITheme.CyanBright, TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold, UIFontRole.Display),
-            60f, 112f + UITheme.TitleMedium * UITheme.DisplayLineStep, 1400f, 144f);
+        TopLeft(Text(layer, "Eyebrow", "TRAINING", UITheme.Eyebrow, UITheme.Orange, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
+            64f, 62f, 900f, 40f);
+        TopLeft(Text(layer, "TitleTop", "PRACTICE", UITheme.TitleMedium, UITheme.White, TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold, UIFontRole.Display),
+            60f, 106f, 1400f, 144f);
+        TopLeft(Text(layer, "TitleBottom", "COURSES", UITheme.TitleMedium, UITheme.Orange, TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold, UIFontRole.Display),
+            60f, 106f + UITheme.TitleMedium * UITheme.DisplayLineStep, 1400f, 144f);
+
+        // The two display lines end at 106 + 89 + a 78-unit cap = 273. A section below that, not
+        // the 25 units the note used to sit at.
+        TMP_Text note = Text(layer, "Note",
+            "Learn the moves here. These are tutorial maps - the run the game is about is Skybound City.",
+            UITheme.Body, UITheme.Label, TextAlignmentOptions.TopLeft, 1f);
+        TopLeft(note, 64f, 273f + UITheme.SectionGap, 1520f, 84f);
+        Prose(note);
 
         Image rule = Img(layer, "Rule", new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.30f));
-        TopLeft((RectTransform)rule.transform, 64f, 344f, 1792f, 1f);
+        TopLeft((RectTransform)rule.transform, 64f, 273f + UITheme.SectionGap + 84f + 12f, 1792f, 1f);
 
         SelectRefs refs = new SelectRefs { Cards = new List<LevelCardView>() };
 
-        refs.Cleared = Text(layer, "Cleared", "0 / 0 CLEARED", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)refs.Cleared.transform, new Vector2(1f, 1f), new Vector2(-64f, -304f), new Vector2(600f, 34f));
+        refs.Cleared = Text(layer, "Cleared", "0 / 0 COMPLETE", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
+        Anchor((RectTransform)refs.Cleared.transform, new Vector2(1f, 1f), new Vector2(-64f, -422f), new Vector2(600f, 36f));
 
         for (int i = 0; i < Mathf.Max(levelCount, 2); i++)
         {
@@ -286,9 +568,15 @@ public static class MainMenuBuilder
 
     private static LevelCardView BuildCard(RectTransform parent, int index)
     {
-        const float cardW = 520f, cardH = 430f;
+        // 500 tall on a 570-wide card, laid on the same two gaps as the rest of the menu. At 430
+        // the title box ended two units *below* where the subtitle began, and every other pair was
+        // 18 to 22 units apart for type 22 to 28 points tall - which is the collision the screens
+        // showed. Nothing here got smaller; the card got taller and the gaps got real.
+        const float cardW = 570f, cardH = 484f;
+        const float previewH = 176f;
+        const float pad = 24f;
         RectTransform rt = Block(parent, $"LevelCard_{index + 1:00}", new Vector2(0f, 1f),
-            new Vector2(64f + index * (cardW + 32f), -392f), new Vector2(cardW, cardH));
+            new Vector2(64f + index * (cardW + 40f), -432f), new Vector2(cardW, cardH));
 
         Image border = Img(rt, "Border", UITheme.PanelBorder);
         Stretch((RectTransform)border.transform);
@@ -301,22 +589,41 @@ public static class MainMenuBuilder
         fill.raycastTarget = true;
 
         RawImage preview = Raw(rt, "Preview", null);
-        Anchor((RectTransform)preview.transform, new Vector2(0.5f, 1f), new Vector2(0f, -1f), new Vector2(cardW - 2f, 186f));
+        Anchor((RectTransform)preview.transform, new Vector2(0.5f, 1f), new Vector2(0f, -1f), new Vector2(cardW - 2f, previewH));
 
         Image previewDim = Img(rt, "PreviewDim", new Color(0.02f, 0.025f, 0.03f, 0.25f));
-        Anchor((RectTransform)previewDim.transform, new Vector2(0.5f, 1f), new Vector2(0f, -1f), new Vector2(cardW - 2f, 186f));
+        Anchor((RectTransform)previewDim.transform, new Vector2(0.5f, 1f), new Vector2(0f, -1f), new Vector2(cardW - 2f, previewH));
 
         TMP_Text idx = Text(rt, "Index", "00", UITheme.StatLabel, new Color(1f, 1f, 1f, 0.55f), TextAlignmentOptions.TopLeft, 6f, FontStyles.Bold, UIFontRole.Mono);
-        Anchor((RectTransform)idx.transform, new Vector2(0f, 1f), new Vector2(20f, -14f), new Vector2(140f, 34f));
+        Anchor((RectTransform)idx.transform, new Vector2(0f, 1f), new Vector2(pad, -16f), new Vector2(140f, 36f));
+
+        // The badge is on the card, not only on the screen around it: a card that has been
+        // screenshotted, or one seen for a second on the way past, still says what it is.
+        Image badgeBar = Img(rt, "TrackBar", UITheme.Orange);
+        Anchor((RectTransform)badgeBar.transform, new Vector2(1f, 1f), new Vector2(-pad, -18f),
+            new Vector2(4f, 30f));
+
+        TMP_Text trackLabel = Text(rt, "TrackLabel", "TRAINING", UITheme.LabelSmall, UITheme.Orange,
+            TextAlignmentOptions.Right, UITheme.LabelSpacing, FontStyles.Bold, UIFontRole.Mono);
+        Anchor((RectTransform)trackLabel.transform, new Vector2(1f, 1f), new Vector2(-pad - 14f, -16f),
+            new Vector2(240f, 34f));
 
         // Title gets the full card width: "INDUSTRIAL PARKOUR" at bold 34 overruns a 340 box and
         // collides with the rating marks, so the stars sit on their own row underneath instead.
+        // Top-down from the bottom of the preview, on the menu's two gaps.
+        float titleY = previewH + UITheme.HeadingGap;
+        float subtitleY = titleY + 48f + 14f;
+        float starsY = subtitleY + 36f + UITheme.HeadingGap;
+        float dividerY = starsY + 28f;
+        float labelY = dividerY + UITheme.HeadingGap;
+        float valueY = labelY + 34f;
+
         TMP_Text title = Text(rt, "Title", "LEVEL", UITheme.CardTitle, UITheme.White, TextAlignmentOptions.TopLeft, 1f, FontStyles.Bold, UIFontRole.Display);
-        Anchor((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(22f, -204f), new Vector2(cardW - 44f, 46f));
+        Anchor((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(pad, -titleY), new Vector2(cardW - pad * 2f, 48f));
         AutoSize(title, UITheme.CardTitle * 0.72f, UITheme.CardTitle);
 
         TMP_Text sub = Text(rt, "Subtitle", "", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.TopLeft, 2f, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)sub.transform, new Vector2(0f, 1f), new Vector2(22f, -248f), new Vector2(cardW - 44f, 34f));
+        Anchor((RectTransform)sub.transform, new Vector2(0f, 1f), new Vector2(pad, -subtitleY), new Vector2(cardW - pad * 2f, 36f));
         AutoSize(sub, UITheme.MinimumSize, UITheme.StatLabel);
 
         List<Image> stars = new List<Image>();
@@ -324,23 +631,24 @@ public static class MainMenuBuilder
         {
             Image s = Img(rt, $"Star_{i + 1}", new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.15f));
             RectTransform srt = (RectTransform)s.transform;
-            Anchor(srt, new Vector2(1f, 1f), new Vector2(-24f - (2 - i) * 32f, -286f), new Vector2(16f, 16f));
+            Anchor(srt, new Vector2(1f, 1f), new Vector2(-pad - (2 - i) * 32f, -starsY), new Vector2(16f, 16f));
             srt.localRotation = Quaternion.Euler(0f, 0f, 45f);
             stars.Add(s);
         }
 
         Image div = Img(rt, "Divider", new Color(1f, 1f, 1f, 0.07f));
-        Anchor((RectTransform)div.transform, new Vector2(0.5f, 1f), new Vector2(0f, -308f), new Vector2(cardW - 44f, 1f));
+        Anchor((RectTransform)div.transform, new Vector2(0.5f, 1f), new Vector2(0f, -dividerY), new Vector2(cardW - pad * 2f, 1f));
 
         TMP_Text bestLabel = Text(rt, "BestLabel", "MODES CLEARED", UITheme.LabelSmall, UITheme.Label, TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)bestLabel.transform, new Vector2(0f, 1f), new Vector2(22f, -326f), new Vector2(260f, 31f));
+        Anchor((RectTransform)bestLabel.transform, new Vector2(0f, 1f), new Vector2(pad, -labelY), new Vector2(250f, 32f));
         TMP_Text bestValue = Text(rt, "BestValue", "--:--.--", UITheme.CardTitle, UITheme.Dim, TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
-        Anchor((RectTransform)bestValue.transform, new Vector2(0f, 1f), new Vector2(22f, -358f), new Vector2(260f, 46f));
+        Anchor((RectTransform)bestValue.transform, new Vector2(0f, 1f), new Vector2(pad, -valueY), new Vector2(250f, 50f));
 
         TMP_Text statusLabel = Text(rt, "StatusLabel", "STATUS", UITheme.LabelSmall, UITheme.Label, TextAlignmentOptions.Right, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
-        Anchor((RectTransform)statusLabel.transform, new Vector2(1f, 1f), new Vector2(-22f, -326f), new Vector2(260f, 31f));
+        Anchor((RectTransform)statusLabel.transform, new Vector2(1f, 1f), new Vector2(-pad, -labelY), new Vector2(250f, 32f));
         TMP_Text statusValue = Text(rt, "StatusValue", "AVAILABLE", UITheme.StatLabel, UITheme.Label, TextAlignmentOptions.Right, 2f, FontStyles.Bold, UIFontRole.Mono);
-        Anchor((RectTransform)statusValue.transform, new Vector2(1f, 1f), new Vector2(-22f, -360f), new Vector2(260f, 40f));
+        Anchor((RectTransform)statusValue.transform, new Vector2(1f, 1f), new Vector2(-pad, -valueY - 4f), new Vector2(250f, 44f));
+        AutoSize(statusValue, UITheme.MinimumSize, UITheme.StatLabel);
 
         Button button = rt.gameObject.AddComponent<Button>();
         button.targetGraphic = fill;
@@ -357,6 +665,7 @@ public static class MainMenuBuilder
         SetRef(card, "button", button);
         SetRef(card, "preview", preview);
         SetRef(card, "indexLabel", idx);
+        SetRef(card, "trackLabel", trackLabel);
         SetRef(card, "title", title);
         SetRef(card, "subtitle", sub);
         SetRef(card, "bestValue", bestValue);
@@ -512,20 +821,20 @@ public static class MainMenuBuilder
         // so the block is 96 tall and the divider under it moves down to match.
         TMP_Text rules = Text(rt, "Rules", ruleText, UITheme.StatLabel, UITheme.Label,
             TextAlignmentOptions.TopLeft, 1f, fontRole: UIFontRole.Mono);
-        TopLeft(rules, 30f, 128f, 548f, 96f);
-        rules.textWrappingMode = TextWrappingModes.Normal;
+        TopLeft(rules, 30f, 128f, 548f, 116f);
+        Prose(rules);
         rules.overflowMode = TextOverflowModes.Ellipsis;
 
         Image divider = Img(rt, "Divider", new Color(1f, 1f, 1f, 0.08f));
-        TopLeft((RectTransform)divider.transform, 30f, 252f, 548f, 1f);
+        TopLeft((RectTransform)divider.transform, 30f, 266f, 548f, 1f);
 
         TMP_Text bestLabel = Text(rt, "BestLabel", "PERSONAL BEST", UITheme.LabelSmall, UITheme.Label,
             TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono);
-        TopLeft(bestLabel, 30f, 278f, 340f, 31f);
+        TopLeft(bestLabel, 30f, 266f + UITheme.HeadingGap, 340f, 32f);
 
         TMP_Text best = Text(rt, "BestValue", "--:--.--", UITheme.StatValue, UITheme.Dim,
             TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
-        TopLeft(best, 30f, 312f, 340f, 58f);
+        TopLeft(best, 30f, 266f + UITheme.HeadingGap + 34f, 340f, 62f);
 
         Button button = rt.gameObject.AddComponent<Button>();
         button.targetGraphic = fill;
@@ -744,6 +1053,20 @@ public static class MainMenuBuilder
     /// comes from a LevelEntry (names, subtitles, current zone) and a longer entry added later
     /// would otherwise clip. Fixed copy keeps a fixed size so the hierarchy stays predictable.
     /// </summary>
+    /// <summary>
+    /// Wrapped prose: leading, and a box tall enough for the lines that leading produces.
+    ///
+    /// Every block of running text in this menu goes through here, so "the lines are too close
+    /// together" is one number in <see cref="UITheme"/> rather than a judgement repeated at each
+    /// call site.
+    /// </summary>
+    private static void Prose(TMP_Text t)
+    {
+        t.textWrappingMode = TextWrappingModes.Normal;
+        t.lineSpacing = UITheme.BodyLeading;
+        t.paragraphSpacing = UITheme.BodyLeading;
+    }
+
     private static void AutoSize(TMP_Text t, float min, float max)
     {
         t.enableAutoSizing = true;

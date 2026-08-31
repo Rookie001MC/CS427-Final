@@ -31,6 +31,14 @@ public sealed class GameplayUIController : MonoBehaviour
             game.RecoveryCountdownTick += HandleRecoveryCountdownTick;
             game.PlayerDied += HandlePlayerDied;
             game.RunFinished += HandleRunFinished;
+
+            // No-Checkpoint Mode's death ends in a choice, and this is what offers it. Saying so
+            // lets the manager honour the mode in scenes that have no death overlay instead of
+            // waiting for a decision that can never arrive.
+            if (deathRecovery != null && deathRecovery.RetryButton != null)
+            {
+                game.AddDeathDecisionResponder();
+            }
         }
 
         if (runTimer != null)
@@ -55,6 +63,11 @@ public sealed class GameplayUIController : MonoBehaviour
             game.RecoveryCountdownTick -= HandleRecoveryCountdownTick;
             game.PlayerDied -= HandlePlayerDied;
             game.RunFinished -= HandleRunFinished;
+
+            if (deathRecovery != null && deathRecovery.RetryButton != null)
+            {
+                game.RemoveDeathDecisionResponder();
+            }
         }
 
         if (runTimer != null)

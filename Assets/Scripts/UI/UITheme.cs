@@ -176,6 +176,25 @@ public static class UITheme
 
     // ---- motion -------------------------------------------------------------------
     /// <summary>Panel fade duration. All UI motion runs on unscaled time.</summary>
+    /// <summary>
+    /// Extra leading on wrapped prose, as a percentage of the point size.
+    ///
+    /// TMP sets multi-line text solid by default, which is right for a display wordmark and wrong
+    /// for anything a player has to read: two 26pt lines of Inter at 0% leading have their
+    /// ascenders sitting on the line above's descenders. 14% is roughly the 1.45 line height the
+    /// rest of the interface is drawn to.
+    /// </summary>
+    public const float BodyLeading = 14f;
+
+    /// <summary>The vertical gutter between two rows of the same list - menu rows, stat pairs.</summary>
+    public const float RowGutter = 20f;
+
+    /// <summary>The gap between a heading and the line under it.</summary>
+    public const float HeadingGap = 26f;
+
+    /// <summary>The gap between one block of content and the next.</summary>
+    public const float SectionGap = 44f;
+
     public const float PanelFade = 0.20f;
 
     /// <summary>Button hover / press response.</summary>

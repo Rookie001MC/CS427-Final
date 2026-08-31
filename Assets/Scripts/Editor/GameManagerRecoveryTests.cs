@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
 public sealed class GameManagerRecoveryTests
@@ -74,6 +75,10 @@ public sealed class GameManagerRecoveryTests
     {
         RunSession.Select(GameMode.NoCheckpoint, "recovery-test");
         Fixture fixture = BuildFixture(countdownStepSeconds: 0.01f);
+
+        // A scene with a death overlay in it - which is what "waits for a decision" presupposes.
+        fixture.Game.AddDeathDecisionResponder();
+
         yield return WaitForState(fixture.Game, RunState.Running);
 
         Assert.That(Activate(fixture.Checkpoints, fixture.Checkpoint), Is.True);
@@ -118,6 +123,136 @@ public sealed class GameManagerRecoveryTests
         Assert.That(fixture.Timer.IsRunning, Is.False);
         Assert.That(fixture.Player.transform.position, Is.EqualTo(fixture.LevelStart.position));
         Assert.That(restartedCountdownTicks, Is.EqualTo(new[] { "1" }));
+    }
+
+
+    // ------------------------------------------------------------------ mode reaches the runtime
+
+    /// <summary>
+    /// The two modes produce different behaviour from the same death, in a scene that has no death
+    /// overlay in it.
+    ///
+    /// This is the hole the bug lived in. `Die` read the rules correctly and took the
+    /// No-Checkpoint branch, but that branch resolved nothing - it stopped the clock and waited for
+    /// a view to call `RestartRun`. Skybound City, which is the level PLAY launches, carries the
+    /// run systems but no `GameplayUIController`, so there was nobody to ask: the run sat in
+    /// Recovering for ever and No-Checkpoint Mode had no effect a player could see. A rule a scene
+    /// has to opt into is not a rule.
+    /// </summary>
+    [UnityTest]
+    public IEnumerator CheckpointDeath_RespawnsWhereNoCheckpointDeathRestartsTheWholeRun()
+    {
+        RunSession.Select(GameMode.Checkpoint, "mode-flow-test");
+        Fixture checkpointRun = BuildFixture(countdownStepSeconds: 0.01f);
+
+        Assert.That(checkpointRun.Game.Mode, Is.EqualTo(GameMode.Checkpoint));
+        Assert.That(checkpointRun.Game.CanPresentDeathDecision, Is.False,
+            "This fixture has no death overlay, which is the case under test.");
+
+        yield return WaitForState(checkpointRun.Game, RunState.Running);
+        Assert.That(Activate(checkpointRun.Checkpoints, checkpointRun.Checkpoint), Is.True);
+        Assert.That(checkpointRun.Game.Die("test death"), Is.True);
+
+        yield return WaitForState(checkpointRun.Game, RunState.Running);
+
+        // Checkpoint Mode: back at the checkpoint, progress and death count intact.
+        Assert.That(checkpointRun.Game.Deaths, Is.EqualTo(1));
+        Assert.That(checkpointRun.Checkpoints.Reached, Is.EqualTo(1));
+        Assert.That(checkpointRun.Player.transform.position,
+            Is.EqualTo(checkpointRun.Checkpoint.transform.position));
+
+        UnityEngine.Object.DestroyImmediate(root);
+        root = null;
+
+        RunSession.Select(GameMode.NoCheckpoint, "mode-flow-test");
+        Fixture failRun = BuildFixture(countdownStepSeconds: 0.01f);
+
+        Assert.That(failRun.Game.Mode, Is.EqualTo(GameMode.NoCheckpoint));
+        Assert.That(failRun.Game.CanPresentDeathDecision, Is.False);
+
+        yield return WaitForState(failRun.Game, RunState.Running);
+        Assert.That(Activate(failRun.Checkpoints, failRun.Checkpoint), Is.True);
+        Assert.That(failRun.Checkpoints.Reached, Is.EqualTo(1));
+        Assert.That(failRun.Game.Die("test death"), Is.True);
+
+        Assert.That(failRun.Game.State, Is.EqualTo(RunState.Recovering));
+        Assert.That(failRun.Timer.IsRunning, Is.False,
+            "No-Checkpoint Mode stops the clock the moment the attempt ends.");
+
+        // No-Checkpoint Mode with nobody to ask: the whole run goes back to the start.
+        yield return WaitForState(failRun.Game, RunState.Running);
+
+        Assert.That(failRun.Game.Deaths, Is.Zero,
+            "The attempt ended, so the run restarted and the death count went with it.");
+        Assert.That(failRun.Checkpoints.Reached, Is.Zero,
+            "No-Checkpoint Mode kept the checkpoint the player had already crossed.");
+        Assert.That(failRun.Player.transform.position, Is.EqualTo(failRun.LevelStart.position));
+        Assert.That(failRun.Player.transform.position,
+            Is.Not.EqualTo(failRun.Checkpoint.transform.position));
+    }
+
+    /// <summary>
+    /// A scene that CAN ask still asks. The fix must not turn No-Checkpoint Mode into an automatic
+    /// restart everywhere - Levels 1 and 2 present the decision, and that is the mode's real shape.
+    /// </summary>
+    [UnityTest]
+    public IEnumerator NoCheckpointDeath_StillWaitsWhereTheSceneCanPresentTheDecision()
+    {
+        RunSession.Select(GameMode.NoCheckpoint, "mode-flow-test");
+        Fixture fixture = BuildFixture(countdownStepSeconds: 0.01f);
+        fixture.Game.AddDeathDecisionResponder();
+
+        Assert.That(fixture.Game.CanPresentDeathDecision, Is.True);
+
+        yield return WaitForState(fixture.Game, RunState.Running);
+        Assert.That(Activate(fixture.Checkpoints, fixture.Checkpoint), Is.True);
+        Assert.That(fixture.Game.Die("test death"), Is.True);
+
+        // Well past the three seconds an unattended failure would have taken to restart.
+        yield return new WaitForSecondsRealtime(4f);
+
+        Assert.That(fixture.Game.State, Is.EqualTo(RunState.Recovering));
+        Assert.That(fixture.Game.Deaths, Is.EqualTo(1));
+        Assert.That(fixture.Checkpoints.Reached, Is.EqualTo(1));
+    }
+
+    /// <summary>
+    /// The mode the menu chose is the mode the level runs in, across the scene load that separates
+    /// them.
+    ///
+    /// `RunSession` is static and the loader writes it before `LoadSceneAsync`, so this is the
+    /// claim that ties the two halves together: whatever the menu selected, a `GameManager` that
+    /// wakes up in a freshly loaded scene reports it.
+    /// </summary>
+    [UnityTest]
+    public IEnumerator TheSelectedModeSurvivesTheSceneLoad()
+    {
+        foreach (GameMode mode in new[] { GameMode.NoCheckpoint, GameMode.Checkpoint })
+        {
+            RunSession.Select(mode, "IndustrialParkour");
+
+            SceneManager.LoadScene("IndustrialParkour");
+
+            // One frame to activate, one for Awake/Start to have run.
+            yield return null;
+            yield return null;
+
+            GameManager game = UnityEngine.Object.FindFirstObjectByType<GameManager>();
+            Assert.That(game, Is.Not.Null, "IndustrialParkour has no GameManager.");
+            Assert.That(RunSession.ActiveMode, Is.EqualTo(mode),
+                "The scene load cleared or replaced the selected mode.");
+            Assert.That(RunSession.ActiveRecordKey, Is.EqualTo("IndustrialParkour"));
+            Assert.That(game.Mode, Is.EqualTo(mode),
+                $"The level is running in {game.Mode} after the menu selected {mode}.");
+            Assert.That(game.Rules.DeathAction, Is.EqualTo(mode == GameMode.Checkpoint
+                ? DeathRecoveryAction.RespawnAtCheckpoint
+                : DeathRecoveryAction.AwaitPlayerDecision));
+
+            // And that scene does carry a death overlay, so it presents the decision rather than
+            // restarting on the player's behalf.
+            Assert.That(game.CanPresentDeathDecision, Is.True,
+                "IndustrialParkour has a GameplayUIController and should be able to ask.");
+        }
     }
 
     private Fixture BuildFixture(float countdownStepSeconds)

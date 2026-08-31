@@ -12,6 +12,10 @@ public sealed class LevelCardView : MonoBehaviour
     [SerializeField] private Button button;
     [SerializeField] private RawImage preview;
     [SerializeField] private TMP_Text indexLabel;
+
+    [Tooltip("TRAINING / MAIN RUN. Says what the card is for, not just which one it is.")]
+    [SerializeField] private TMP_Text trackLabel;
+
     [SerializeField] private TMP_Text title;
     [SerializeField] private TMP_Text subtitle;
     [SerializeField] private TMP_Text bestValue;
@@ -56,6 +60,12 @@ public sealed class LevelCardView : MonoBehaviour
         if (indexLabel != null)
         {
             indexLabel.text = $"{entry.LevelNumber:00}";
+        }
+
+        if (trackLabel != null)
+        {
+            trackLabel.text = entry.TrackLabel;
+            trackLabel.color = entry.IsMainRun ? UITheme.CyanBright : UITheme.Orange;
         }
 
         if (title != null)

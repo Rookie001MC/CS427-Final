@@ -26,11 +26,20 @@ using UnityEngine;
 ///   <b>It holds still.</b> The first version of this component recomputed everything it drew from
 ///   the player's position every frame, and flickered. All of the state that used to live here now
 ///   lives in <see cref="RouteTrail"/>, which is a pure object over the graph and so can be walked
-///   for a thousand frames by a test: markers are anchored to the route's own arc length, which of
-///   them are showing is a windowed projection of the player onto that same arc, the node under the
-///   player is chosen with hysteresis, and a search only happens when the objective changes or the
-///   player has actually stepped off the route. What is left in this file is the view - a fixed
-///   pool of transforms, pointed at whatever the trail says is visible.
+///   for a thousand frames by a test: markers are laid once for the whole route and anchored at
+///   whole spacings back from the objective, which of them are showing is a windowed projection of
+///   the player onto the route's arc, the node under the player is chosen with hysteresis, and a
+///   search only happens when the objective changes or the player has actually stepped off the
+///   route.
+///
+///   What is left in this file is the view, and the view had the last of the flicker in it. A pool
+///   slot was given whatever the trail's i-th visible marker was, so running past one chevron shifted
+///   every marker behind it down a slot: 535 live objects teleported - up to 30 m, and turning
+///   through up to 90 degrees - over a 400 m run in which only 36 markers genuinely came into view,
+///   and the object at the far end blinked off and on again as the count wobbled. A marker is now a
+///   thing with an identity - the square metre of city it stands on - and a slot is bound to one
+///   until it leaves the window. A slot that keeps its marker is never re-aimed, never re-enabled,
+///   and never moved except by the twelve centimetres of bob it is supposed to have.
 /// </summary>
 public sealed class RouteGuide : MonoBehaviour
 {
@@ -81,6 +90,15 @@ public sealed class RouteGuide : MonoBehaviour
     private readonly List<Breadcrumb> chevrons = new List<Breadcrumb>();
     private readonly List<Breadcrumb> actions = new List<Breadcrumb>();
 
+    // Which pool object is standing on which marker. The whole of the persistent-marker model, and
+    // in `City` rather than here so a test can walk it for ten thousand frames.
+    private GuideMarkerPool chevronPool;
+    private GuideMarkerPool actionPool;
+
+    private readonly List<int> slots = new List<int>();
+    private readonly List<bool> fresh = new List<bool>();
+    private readonly List<int> release = new List<int>();
+
     /// <summary>How many chevrons are currently showing. Zero when there is no route.</summary>
     public int VisibleMarkers { get; private set; }
 
@@ -99,6 +117,18 @@ public sealed class RouteGuide : MonoBehaviour
 
     /// <summary>How many graph searches the guide has run. Instrumentation for the harnesses.</summary>
     public int Searches => trail != null ? trail.Searches : 0;
+
+    /// <summary>
+    /// How many times a pool object has been put on a marker it was not already on: switched on,
+    /// aimed and moved. Instrumentation, and the number the flicker was measured in - it should
+    /// equal the number of markers that have genuinely come into view, and nothing more.
+    /// </summary>
+    public int Rebinds => (chevronPool != null ? chevronPool.Rebinds : 0)
+                          + (actionPool != null ? actionPool.Rebinds : 0);
+
+    /// <summary>How many times a pool object has been switched on or off.</summary>
+    public int Toggles => (chevronPool != null ? chevronPool.Toggles : 0)
+                          + (actionPool != null ? actionPool.Toggles : 0);
 
     // What the builder baked in, so Harness E can check the scene against the plan rather than
     // taking the builder's word for it. A guide wired to an empty graph draws nothing and reports
@@ -159,6 +189,9 @@ public sealed class RouteGuide : MonoBehaviour
         // Room for the pool plus a spare pool's worth, so the far end of the drawn window is laid
         // before the near end is consumed and the trail never runs out mid-stride.
         trail = new RouteTrail(graph, markers.Length + CityDesign.GuideMarkerCount);
+
+        chevronPool = new GuideMarkerPool(markers.Length);
+        actionPool = new GuideMarkerPool(actionMarkers.Length);
     }
 
     /// <summary>
@@ -201,33 +234,55 @@ public sealed class RouteGuide : MonoBehaviour
     }
 
     /// <summary>
-    /// Puts the pools on the markers the trail asked for.
+    /// Puts the pools on the markers the trail asked for, and leaves alone every object already
+    /// standing on one.
     ///
-    /// Which pool object draws which marker is not stable and does not need to be - as the player
-    /// runs past the nearest chevron every marker behind it shifts down a slot - because a slot is
-    /// given its whole transform every frame. What must be stable, and is, is the set of world
-    /// positions: the same route asks for the same square metres of the city, whoever is drawing
-    /// them.
+    /// Which pool object draws which marker <b>is</b> stable, and has to be. The old version handed
+    /// slot i the i-th visible marker, which is correct as a picture and wrong as a scene: running
+    /// past the nearest chevron shifted every marker behind it down a slot, so twenty-odd live
+    /// GameObjects were teleported and re-aimed on that frame. Nothing in a still frame shows it -
+    /// the set of world positions was right either way - and everything in a moving one does,
+    /// because a renderer that is moved discontinuously is a renderer with no motion vector, no
+    /// temporal history and, at the end of the pool, a `SetActive` flip.
+    ///
+    /// So a marker is identified by the square metre it stands on, a slot holds one until the trail
+    /// stops asking for it, and a slot that holds its marker is touched for the bob and nothing
+    /// else.
     /// </summary>
     private void Draw()
     {
-        for (int i = 0; i < chevrons.Count; i++)
-        {
-            Place(markers[i], chevrons[i], true);
-        }
-
-        for (int i = 0; i < actions.Count; i++)
-        {
-            Place(actionMarkers[i], actions[i], false);
-        }
-
-        Hide(markers, chevrons.Count);
-        Hide(actionMarkers, actions.Count);
+        Show(markers, chevronPool, chevrons, true);
+        Show(actionMarkers, actionPool, actions, false);
 
         VisibleMarkers = chevrons.Count;
         VisibleActionMarkers = actions.Count;
     }
 
+    /// <summary>Turns one frame of the pool's binding into transforms.</summary>
+    private void Show(Transform[] pool, GuideMarkerPool binding, List<Breadcrumb> wanted, bool bob)
+    {
+        binding.Bind(wanted, slots, fresh, release);
+
+        for (int i = 0; i < release.Count; i++)
+        {
+            Transform marker = pool[release[i]];
+
+            if (marker != null && marker.gameObject.activeSelf)
+            {
+                marker.gameObject.SetActive(false);
+            }
+        }
+
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            if (slots[i] >= 0)
+            {
+                Place(pool[slots[i]], wanted[i], bob, fresh[i]);
+            }
+        }
+    }
+
+    /// <summary>The graph node the objective with this id stands on, or -1.</summary>
     private int TargetNode(string id)
     {
         for (int i = 0; i < targetIds.Length && i < targetNodes.Length; i++)
@@ -250,7 +305,7 @@ public sealed class RouteGuide : MonoBehaviour
     /// slot had faced. <see cref="CityNavigation.Breadcrumbs"/> now carries the last real heading
     /// forward instead, so there is nothing left to fall back to.
     /// </summary>
-    private void Place(Transform marker, Breadcrumb crumb, bool bob)
+    private void Place(Transform marker, Breadcrumb crumb, bool bob, bool fresh)
     {
         if (marker == null)
         {
@@ -261,13 +316,25 @@ public sealed class RouteGuide : MonoBehaviour
 
         if (bob)
         {
-            // Keyed to the marker's place on the route, so the pulse belongs to the spot on the
-            // ground rather than to whichever pool object is currently drawing it.
-            lift += Mathf.Sin(Time.time * 2.2f - crumb.Along * 0.35f) * 0.12f;
+            // Keyed to the marker's distance from the objective, so the pulse belongs to the spot on
+            // the ground rather than to whichever pool object is drawing it - and so it does not
+            // jump when a re-search changes how far the marker is from the *start* of the route,
+            // which happens every time the player steps across a rooftop boundary.
+            lift += Mathf.Sin(Time.time * 2.2f - crumb.Remaining * 0.35f) * 0.12f;
         }
 
-        marker.SetPositionAndRotation(crumb.Position + Vector3.up * lift,
-            Quaternion.LookRotation(crumb.Forward, Vector3.up));
+        if (fresh)
+        {
+            // A marker's heading is a property of the route, so it is written once, when the object
+            // arrives on it. Re-aiming a marker that has not moved is how a chevron came to swing
+            // through 90 degrees on a frame the player ran past a different one.
+            marker.SetPositionAndRotation(crumb.Position + Vector3.up * lift,
+                Quaternion.LookRotation(crumb.Forward, Vector3.up));
+        }
+        else if (bob)
+        {
+            marker.position = crumb.Position + Vector3.up * lift;
+        }
 
         if (!marker.gameObject.activeSelf)
         {
@@ -275,9 +342,11 @@ public sealed class RouteGuide : MonoBehaviour
         }
     }
 
-    private static void Hide(Transform[] pool, int from)
+    private void Hide(Transform[] pool, GuideMarkerPool binding)
     {
-        for (int i = from; i < pool.Length; i++)
+        binding?.Clear(release);
+
+        for (int i = 0; i < pool.Length; i++)
         {
             if (pool[i] != null && pool[i].gameObject.activeSelf)
             {
@@ -309,8 +378,8 @@ public sealed class RouteGuide : MonoBehaviour
         VisibleMarkers = 0;
         VisibleActionMarkers = 0;
 
-        Hide(markers, 0);
-        Hide(actionMarkers, 0);
+        Hide(markers, chevronPool);
+        Hide(actionMarkers, actionPool);
 
         if (beacon != null && beacon.gameObject.activeSelf)
         {
