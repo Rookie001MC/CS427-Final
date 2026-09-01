@@ -29,6 +29,33 @@ public sealed class SkyboundCityTests
 
     private static TraversalEnvelope.Movement Movement => TraversalEnvelope.Default;
 
+    private static void AssertSameRect(in CityRect actual, in CityRect expected, string message)
+    {
+        Assert.That(actual.MinX, Is.EqualTo(expected.MinX).Within(0.0001f), message);
+        Assert.That(actual.MaxX, Is.EqualTo(expected.MaxX).Within(0.0001f), message);
+        Assert.That(actual.MinZ, Is.EqualTo(expected.MinZ).Within(0.0001f), message);
+        Assert.That(actual.MaxZ, Is.EqualTo(expected.MaxZ).Within(0.0001f), message);
+    }
+
+    private static void AssertPointInside(in Vector3 point, in CityRect rect, string message)
+    {
+        Assert.That(point.x, Is.InRange(rect.MinX - 0.0001f, rect.MaxX + 0.0001f), message);
+        Assert.That(point.z, Is.InRange(rect.MinZ - 0.0001f, rect.MaxZ + 0.0001f), message);
+    }
+
+    private static void AssertWalkableConnection(in CityRect landing, in CityRect surface,
+        string message)
+    {
+        float overlapX = Mathf.Min(landing.MaxX, surface.MaxX)
+                         - Mathf.Max(landing.MinX, surface.MinX);
+        float overlapZ = Mathf.Min(landing.MaxZ, surface.MaxZ)
+                         - Mathf.Max(landing.MinZ, surface.MinZ);
+
+        Assert.That(landing.GapTo(surface), Is.EqualTo(0f).Within(0.0001f), message);
+        Assert.That(Mathf.Max(overlapX, overlapZ),
+            Is.GreaterThanOrEqualTo(CityDesign.StairClearWidth - 0.0001f), message);
+    }
+
     // ------------------------------------------------------------------ the grid
 
     [Test]
@@ -231,6 +258,33 @@ public sealed class SkyboundCityTests
             Assert.That(b.Buildings[i].RoofY, Is.EqualTo(a.Buildings[i].RoofY).Within(0.0001f));
             Assert.That(b.Buildings[i].Footprint.MinX,
                 Is.EqualTo(a.Buildings[i].Footprint.MinX).Within(0.0001f));
+        }
+
+        Assert.That(b.StairFlights.Count, Is.EqualTo(a.StairFlights.Count));
+
+        for (int i = 0; i < a.StairFlights.Count; i++)
+        {
+            StairFlightPlan expected = a.StairFlights[i];
+            StairFlightPlan actual = b.StairFlights[i];
+
+            Assert.That(actual.Start.x, Is.EqualTo(expected.Start.x).Within(0.0001f));
+            Assert.That(actual.Start.y, Is.EqualTo(expected.Start.y).Within(0.0001f));
+            Assert.That(actual.Start.z, Is.EqualTo(expected.Start.z).Within(0.0001f));
+            Assert.That(actual.Direction.x, Is.EqualTo(expected.Direction.x).Within(0.0001f));
+            Assert.That(actual.Direction.z, Is.EqualTo(expected.Direction.z).Within(0.0001f));
+            Assert.That(actual.StepCount, Is.EqualTo(expected.StepCount));
+            Assert.That(actual.RiserHeight, Is.EqualTo(expected.RiserHeight).Within(0.0001f));
+            Assert.That(actual.Name, Is.EqualTo(expected.Name));
+            Assert.That(actual.TreadDepth, Is.EqualTo(expected.TreadDepth).Within(0.0001f));
+            Assert.That(actual.ClearWidth, Is.EqualTo(expected.ClearWidth).Within(0.0001f));
+            Assert.That(actual.LandingBeforeDepth,
+                Is.EqualTo(expected.LandingBeforeDepth).Within(0.0001f));
+            Assert.That(actual.LandingAfterDepth,
+                Is.EqualTo(expected.LandingAfterDepth).Within(0.0001f));
+            AssertSameRect(actual.LandingBefore, expected.LandingBefore,
+                $"Flight {i} changed its low landing for the same seed.");
+            AssertSameRect(actual.LandingAfter, expected.LandingAfter,
+                $"Flight {i} changed its high landing for the same seed.");
         }
     }
 
@@ -777,46 +831,137 @@ public sealed class SkyboundCityTests
     }
 
     [Test]
-    public void Ascents_EveryStepIsOneMantleAndGradesOrangeAtWorst()
+    public void Ascents_AllNonTowerRoutesAreWalkableStairs()
     {
-        int steps = 0;
+        int stairs = 0;
 
         foreach (AscentPlan ascent in Plan.Traversal.Ascents)
         {
-            if (ascent.IsRamped)
+            if (ascent.Kind == AscentKind.TowerSpiral)
             {
                 continue;
             }
 
-            Assert.That(ascent.StepRise,
-                Is.LessThanOrEqualTo(CityDesign.AscentStepRise + 0.001f),
-                $"{ascent.Name} climbs {ascent.StepRise:F2} m in one move.");
-
-            int index = 0;
-
-            foreach (AscentStep step in ascent.Steps())
-            {
-                steps++;
-                Assert.That(step.Tier, Is.LessThanOrEqualTo(RouteTier.Orange),
-                    $"{ascent.Name} step {index}: gap {step.Gap:F2} m, rise {step.Rise:F2} m, " +
-                    $"landing {step.LandingDepth:F2} m. Every step of an ascent is one mantle, " +
-                    "and a mantle is ORANGE.");
-                index++;
-            }
+            stairs++;
+            Assert.That(ascent.Style, Is.EqualTo(AscentTraversalStyle.WalkableStair),
+                $"{ascent.Name} is still classified as mantle-only traversal.");
+            Assert.That(ascent.Flights, Is.Not.Empty,
+                $"{ascent.Name} has no continuous stair flights.");
         }
 
-        Assert.That(steps, Is.GreaterThan(0));
+        Assert.That(stairs, Is.GreaterThan(0));
     }
 
     [Test]
-    public void Ascents_StepRiseStaysInsideTheMantleAllowance()
+    public void Ascents_EveryStairFlightUsesSafeStepDimensions()
     {
-        // The design constant, not the geometry: 1.8 m is chosen to sit inside the tier table's
-        // 2.0 m mantle step with margin, and if the table ever tightens this is what breaks.
-        Assert.That(CityDesign.AscentStepRise, Is.LessThan(RouteTiers.MantleStepRise),
-            "A step the player cannot mantle is not a step.");
-        Assert.That(RouteTiers.Classify(0.2f, CityDesign.AscentStepRise,
-                CityDesign.AscentLandingDepth), Is.EqualTo(RouteTier.Orange));
+        int flights = 0;
+
+        foreach (AscentPlan ascent in Plan.Traversal.Ascents)
+        {
+            if (ascent.Style != AscentTraversalStyle.WalkableStair)
+            {
+                continue;
+            }
+
+            int expectedSteps = Mathf.CeilToInt(
+                ascent.Rise / CityDesign.StairMaximumRiserHeight - 0.0001f);
+            int plannedSteps = 0;
+
+            for (int i = 0; i < ascent.Flights.Count; i++)
+            {
+                StairFlightPlan flight = ascent.Flights[i];
+                flights++;
+                plannedSteps += flight.StepCount;
+
+                Assert.That(flight.StepCount, Is.GreaterThan(0),
+                    $"{ascent.Name} flight {i} has no visible steps.");
+                Assert.That(flight.RiserHeight,
+                    Is.GreaterThan(0f).And.LessThanOrEqualTo(
+                        CityDesign.StairMaximumRiserHeight + 0.0001f),
+                    $"{ascent.Name} flight {i} has a {flight.RiserHeight:F3} m riser.");
+                Assert.That(flight.TreadDepth,
+                    Is.GreaterThanOrEqualTo(CityDesign.StairPreferredTreadDepth - 0.0001f),
+                    $"{ascent.Name} flight {i} has only {flight.TreadDepth:F3} m of tread.");
+                Assert.That(flight.ClearWidth,
+                    Is.EqualTo(CityDesign.StairClearWidth).Within(0.0001f),
+                    $"{ascent.Name} flight {i} does not provide the required clear width.");
+            }
+
+            Assert.That(plannedSteps, Is.EqualTo(expectedSteps),
+                $"{ascent.Name} must derive one deterministic step count from its full rise.");
+            Assert.That(ascent.StepCount, Is.EqualTo(expectedSteps));
+            Assert.That(ascent.StepRise,
+                Is.EqualTo(ascent.Rise / expectedSteps).Within(0.0001f));
+        }
+
+        Assert.That(flights, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void Ascents_StairFlightsJoinThroughFullTurnLandings()
+    {
+        foreach (AscentPlan ascent in Plan.Traversal.Ascents)
+        {
+            if (ascent.Style != AscentTraversalStyle.WalkableStair)
+            {
+                continue;
+            }
+
+            for (int i = 1; i < ascent.Flights.Count; i++)
+            {
+                StairFlightPlan before = ascent.Flights[i - 1];
+                StairFlightPlan after = ascent.Flights[i];
+
+                Assert.That(before.LandingAfterDepth,
+                    Is.GreaterThanOrEqualTo(CityDesign.StairTurnLandingDepth - 0.0001f));
+                Assert.That(after.LandingBeforeDepth,
+                    Is.GreaterThanOrEqualTo(CityDesign.StairTurnLandingDepth - 0.0001f));
+                Assert.That(after.Start.y, Is.EqualTo(before.End.y).Within(0.0001f),
+                    $"{ascent.Name} flights {i - 1} and {i} disagree on landing height.");
+                AssertSameRect(before.LandingAfter, after.LandingBefore,
+                    $"{ascent.Name} flights {i - 1} and {i} do not share one turn landing.");
+                AssertPointInside(before.End, before.LandingAfter,
+                    $"{ascent.Name} flight {i - 1} misses its turn landing.");
+                AssertPointInside(after.Start, after.LandingBefore,
+                    $"{ascent.Name} flight {i} does not start on its turn landing.");
+            }
+        }
+    }
+
+    [Test]
+    public void Ascents_StairsReachTheirDeclaredTargetWithoutMantleSteps()
+    {
+        foreach (AscentPlan ascent in Plan.Traversal.Ascents)
+        {
+            if (ascent.Style != AscentTraversalStyle.WalkableStair)
+            {
+                continue;
+            }
+
+            StairFlightPlan last = ascent.Flights[ascent.Flights.Count - 1];
+            StairFlightPlan first = ascent.Flights[0];
+
+            Assert.That(first.Start.y, Is.EqualTo(ascent.BaseY).Within(0.0001f));
+            AssertWalkableConnection(first.LandingBefore, ascent.BottomFootprint,
+                $"{ascent.Name} requires a jump to reach its first stair landing.");
+            Assert.That(last.End.y, Is.EqualTo(ascent.TopY).Within(0.0001f),
+                $"{ascent.Name} does not finish at its declared target height.");
+            Assert.That(ascent.FinalLandingY, Is.EqualTo(ascent.TopY).Within(0.0001f));
+            AssertSameRect(last.LandingAfter, ascent.FinalLanding,
+                $"{ascent.Name} records a different final landing than its last flight.");
+            AssertWalkableConnection(ascent.FinalLanding, ascent.TopFootprint,
+                $"{ascent.Name} final landing does not connect to its target slab.");
+
+            int mantleSteps = 0;
+            foreach (AscentStep unused in ascent.Steps())
+            {
+                mantleSteps++;
+            }
+
+            Assert.That(mantleSteps, Is.EqualTo(0),
+                $"{ascent.Name} still exposes a mantle-only traversal path.");
+        }
     }
 
     [Test]
@@ -900,6 +1045,7 @@ public sealed class SkyboundCityTests
     {
         AscentPlan spiral = Spiral();
 
+        Assert.That(spiral.Style, Is.EqualTo(AscentTraversalStyle.Ramp));
         Assert.That(spiral.IsRamped, Is.True);
         Assert.That(spiral.PitchDegrees,
             Is.LessThanOrEqualTo(CityDesign.TowerSpiralMaxPitch + 0.001f));
@@ -1508,7 +1654,7 @@ public sealed class SkyboundCityTests
         Assert.That(plan.ColliderCount,
             Is.EqualTo(plan.Buildings.Count + plan.Slabs.Count + solids + plan.Ramps.Count
                        + plan.Volumes.Count),
-            "The collider count is the four massing lists and the triggers, and nothing else. " +
+            "The collider count is the four built massing lists and the triggers, and nothing else. " +
             "If the art layer had grown a collider it would have to be here.");
 
         // And nothing the art layer emitted leaked into a list the builder makes solids out of.

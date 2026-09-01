@@ -23,7 +23,7 @@ public enum LinkKind
     Crane
 }
 
-/// <summary>Why an ascent exists. All four are the same stack of ledges; only the reading differs.</summary>
+/// <summary>Why an ascent exists architecturally.</summary>
 public enum AscentKind
 {
     /// <summary>Street to roof, on a facade.</summary>
@@ -40,6 +40,16 @@ public enum AscentKind
 
     /// <summary>The ramped spiral up the tower shaft. Walked, not mantled.</summary>
     TowerSpiral
+}
+
+/// <summary>How the player gains height on an ascent, independent of its architectural theme.</summary>
+public enum AscentTraversalStyle
+{
+    /// <summary>Visible steps over a continuous walking surface.</summary>
+    WalkableStair,
+
+    /// <summary>The existing shallow tower spiral.</summary>
+    Ramp
 }
 
 /// <summary>What a <see cref="SurfaceRef"/> points at.</summary>
@@ -141,13 +151,13 @@ public readonly struct DistrictLink
     }
 }
 
-/// <summary>One authored stack of ledges.</summary>
+/// <summary>One authored ascent site.</summary>
 public readonly struct AscentSite
 {
     public readonly string Name;
     public readonly AscentKind Kind;
 
-    /// <summary>The surface the stack reaches.</summary>
+    /// <summary>The surface the ascent reaches.</summary>
     public readonly SurfaceRef Top;
 
     /// <summary>Which facade of <see cref="Top"/> it is hung on.</summary>
@@ -230,31 +240,35 @@ public readonly struct AscentStep
     public RouteTier Tier => RouteTiers.Classify(Gap, Rise, LandingDepth);
 }
 
-/// <summary>A resolved ascent: the ledges, and every step between them.</summary>
+/// <summary>A resolved ascent and its canonical world-space traversal geometry.</summary>
 public sealed class AscentPlan
 {
     public string Name;
     public AscentKind Kind;
+    public AscentTraversalStyle Style;
     public string BottomNode;
     public string TopNode;
     public bool FromStreet;
     public float BaseY;
     public float TopY;
+
+    /// <summary>Visible riser height for stairs; rise per run for a ramp.</summary>
     public float StepRise;
 
-    /// <summary>Number of moves from the bottom surface to the top one.</summary>
+    /// <summary>Total visible risers for stairs; run count for a ramp.</summary>
     public int StepCount;
 
-    /// <summary>The intermediate ledges. One fewer than <see cref="StepCount"/>.</summary>
+    /// <summary>Horizontal stair landings in traversal order, including bottom and final landings.</summary>
     public readonly List<CityRect> Landings = new List<CityRect>();
 
     public readonly List<float> LandingY = new List<float>();
 
+    public readonly List<StairFlightPlan> Flights = new List<StairFlightPlan>();
+
     public CityRect BottomFootprint;
     public CityRect TopFootprint;
 
-    /// <summary>Set for <see cref="AscentKind.TowerSpiral"/>, which is walked instead of mantled.</summary>
-    public bool IsRamped;
+    public bool IsRamped => Style == AscentTraversalStyle.Ramp;
 
     public float PitchDegrees;
 
@@ -267,6 +281,8 @@ public sealed class AscentPlan
 
     /// <summary>The last corner landing of a ramped ascent, which the summit slab adjoins.</summary>
     public CityRect FinalLanding;
+
+    public float FinalLandingY;
 
     /// <summary>
     /// The corner a ramped ascent is entered at, on the surface it starts from. Phase 6D's tower
@@ -283,32 +299,10 @@ public sealed class AscentPlan
 
     public float Rise => TopY - BaseY;
 
-    /// <summary>
-    /// Every move the player makes climbing this, as a gap / rise / landing triple. A ramped ascent
-    /// has no steps - it is graded on its pitch instead.
-    /// </summary>
+    /// <summary>Legacy jump/mantle measurements; continuously walkable ascents expose none.</summary>
     public IEnumerable<AscentStep> Steps()
     {
-        if (IsRamped)
-        {
-            yield break;
-        }
-
-        for (int i = 0; i < StepCount; i++)
-        {
-            CityRect from = i == 0 ? BottomFootprint : Landings[i - 1];
-            bool last = i == StepCount - 1;
-            CityRect to = last ? TopFootprint : Landings[i];
-            float toY = last ? TopY : LandingY[i];
-            float fromY = i == 0 ? BaseY : LandingY[i - 1];
-
-            // The bottom of a street ascent is the pavement under the stack, so the player is
-            // already standing beneath the first ledge and the gap is zero by construction.
-            float gap = FromStreet && i == 0 ? 0f : from.GapTo(to);
-            float landing = Mathf.Min(to.Width, to.Depth);
-
-            yield return new AscentStep(gap, toY - fromY, landing);
-        }
+        yield break;
     }
 }
 
@@ -453,15 +447,13 @@ public sealed class CityTraversalResult
 /// file is that geometry, and - like everything else in the city - it is data first and boxes
 /// second:
 ///
-///   <b>Ascents</b>    a stack of ledges, one <see cref="CityDesign.AscentStepRise"/> apart, hung on
-///                     a facade. Read as a fire escape from the street, a scaffold on the
-///                     construction site, a riser between two roof plateaus, or the stair a link
-///                     needs at its taller end. Every step is one mantle, so every step is ORANGE.
+///   <b>Ascents</b>    walkable stair flights hung on a facade. Read as a fire escape from the
+///                     street, a scaffold on the construction site, a riser between two roof
+///                     plateaus, or the stair a link needs at its taller end.
 ///   <b>Links</b>      a deck across an avenue, at the lower of the two roofs so one end is always
 ///                     flush. Nine of them, six between different districts.
 ///   <b>The crane</b>  the same idea, above both roofs and only as wide as a BLUE landing.
-///   <b>The spiral</b> a ramped ascent of the tower shaft. 79.8 m of mantles would be 45 steps;
-///                     this is eight walked runs instead.
+///   <b>The spiral</b> the one ramped ascent, wrapping the tower shaft in walked runs.
 ///
 /// The endpoints are authored as lot indices, not coordinates, so the network survives a change to
 /// the seed. What it does *not* survive silently is a change that makes a step unclimbable - that
@@ -558,9 +550,8 @@ public static class CityTraversal
     /// roof plateau and the next.
     ///
     /// Every street ascent is on a facade that faces an avenue, the perimeter or an open forecourt.
-    /// That is not aesthetics: the lowest ledge is 1.8 m up, which is below the player's standing
-    /// height, so a stack hung over one of the Old Quarter's 3.5 m streets would take that street
-    /// out of the walkable network Phase 6B proved.
+    /// The stair planner keeps its turn landings clear of facade ends so these ascents preserve the
+    /// street network Phase 6B proved.
     /// </summary>
     public static readonly AscentSite[] Ascents =
     {
@@ -654,13 +645,8 @@ public static class CityTraversal
     ///
     /// Three is the Phase 6C exit criterion, and these are the three that read as genuinely
     /// different approaches rather than three doors into the same stairwell. The Corporate relay
-    /// has no street ascent of its own - its towers start at 46.8 m and a fire escape up one would
-    /// be twenty-eight mantles - so all three of its routes arrive over a bridge, which is exactly
-    /// the thing the Corporate district is supposed to feel like.
-    ///
-    /// Every one of them is declared ORANGE, because every ascent in the city is a stack of
-    /// mantles and a mantle is ORANGE. A rooftop route that measures RED is therefore a design
-    /// error, not a hard route, and the validator says so.
+    /// has no street ascent of its own, so all three of its routes arrive over a bridge, which is
+    /// exactly the thing the Corporate district is supposed to feel like.
     /// </summary>
     public static readonly RoofRouteSite[] RoofRoutes =
     {
@@ -998,12 +984,12 @@ public static class CityTraversal
     {
         if (crane)
         {
-            link.Stairs.Add(Stack($"{link.Name} (from stair)", AscentKind.LinkStair,
+            link.Stairs.Add(PlanStair($"{link.Name} (from stair)", AscentKind.LinkStair,
                 from.Node, link.DeckNode, from.Footprint, from.SurfaceY, link.Deck, link.DeckY,
-                from.Footprint, fromSide, cross, false));
-            link.Stairs.Add(Stack($"{link.Name} (to stair)", AscentKind.LinkStair,
+                from.Footprint, fromSide, cross));
+            link.Stairs.Add(PlanStair($"{link.Name} (to stair)", AscentKind.LinkStair,
                 to.Node, link.DeckNode, to.Footprint, to.SurfaceY, link.Deck, link.DeckY,
-                to.Footprint, toSide, cross, false));
+                to.Footprint, toSide, cross));
             return;
         }
 
@@ -1018,9 +1004,9 @@ public static class CityTraversal
         TraversalSurface high = fromIsHigher ? from : to;
         Facade side = fromIsHigher ? fromSide : toSide;
 
-        link.Stairs.Add(Stack($"{link.Name} (stair)", AscentKind.LinkStair,
+        link.Stairs.Add(PlanStair($"{link.Name} (stair)", AscentKind.LinkStair,
             link.DeckNode, high.Node, link.Deck, link.DeckY, high.Footprint, high.SurfaceY,
-            high.Footprint, side, cross, false));
+            high.Footprint, side, cross));
     }
 
     /// <summary>The mast, the cab and the counter-jib. None of it is on the traversal path.</summary>
@@ -1104,11 +1090,10 @@ public static class CityTraversal
             }
 
             float cross = CrossCentre(top.Footprint, site.Side) + site.CrossOffset;
-            bool scaffold = site.Kind == AscentKind.Scaffold;
 
-            AscentPlan ascent = Stack(site.Name, site.Kind, bottom.Node, top.Node,
+            AscentPlan ascent = PlanStair(site.Name, site.Kind, bottom.Node, top.Node,
                 bottom.Footprint, bottom.SurfaceY, top.Footprint, top.SurfaceY,
-                top.Footprint, site.Side, cross, scaffold);
+                top.Footprint, site.Side, cross);
 
             ascent.FromStreet = fromStreet;
 
@@ -1124,50 +1109,194 @@ public static class CityTraversal
         }
     }
 
-    /// <summary>Centre of the facade a stack hangs on, along the axis it runs.</summary>
+    /// <summary>Centre of the facade an ascent hangs on, along the axis it runs.</summary>
     private static float CrossCentre(CityRect host, Facade side)
         => side == Facade.West || side == Facade.East ? host.CentreZ : host.CentreX;
 
     /// <summary>
-    /// Builds a stack of ledges from <paramref name="baseY"/> to <paramref name="topY"/>, hung on
+    /// Plans a two-lane stair from <paramref name="baseY"/> to <paramref name="topY"/>, hung on
     /// one facade of <paramref name="host"/>.
     ///
-    /// The step count is the smallest that keeps every rise inside
-    /// <see cref="CityDesign.AscentStepRise"/>, and the rise is then shared out evenly - so a
-    /// 2.0 m climb is two 1.0 m steps rather than a 1.8 m one and a 0.2 m stub.
+    /// One step count and one riser are derived from the full rise. A flight runs as far as the
+    /// host facade allows; only the remaining steps turn onto the adjacent lane. All positions are
+    /// world-space planner data, so later builders consume them without re-derivation.
     /// </summary>
-    private static AscentPlan Stack(string name, AscentKind kind, string bottomNode, string topNode,
+    private static AscentPlan PlanStair(string name, AscentKind kind,
+        string bottomNode, string topNode,
         CityRect bottomFootprint, float baseY, CityRect topFootprint, float topY,
-        CityRect host, Facade side, float cross, bool scaffold)
+        CityRect host, Facade side, float cross)
     {
         float rise = topY - baseY;
-        int steps = Mathf.Max(0, Mathf.CeilToInt(rise / CityDesign.AscentStepRise - 0.0001f));
+        int totalSteps = Mathf.Max(0,
+            Mathf.CeilToInt(rise / CityDesign.StairMaximumRiserHeight - 0.0001f));
+        float riser = totalSteps > 0 ? rise / totalSteps : 0f;
 
         AscentPlan ascent = new AscentPlan
         {
             Name = name,
             Kind = kind,
+            Style = AscentTraversalStyle.WalkableStair,
             BottomNode = bottomNode,
             TopNode = topNode,
             BaseY = baseY,
             TopY = topY,
-            StepCount = steps,
-            StepRise = steps > 0 ? rise / steps : 0f,
+            StepCount = totalSteps,
+            StepRise = riser,
             BottomFootprint = bottomFootprint,
             TopFootprint = topFootprint
         };
 
-        float width = scaffold ? CityDesign.ScaffoldLandingWidth : CityDesign.AscentLandingWidth;
-        float depth = scaffold ? CityDesign.ScaffoldLandingDepth : CityDesign.AscentLandingDepth;
-
-        for (int k = 1; k < steps; k++)
+        if (totalSteps <= 0)
         {
-            float centre = cross + (k % 2 == 1 ? CityDesign.AscentZigzag : -CityDesign.AscentZigzag);
-            ascent.Landings.Add(Landing(host, side, centre, width, depth));
-            ascent.LandingY.Add(baseY + ascent.StepRise * k);
+            return ascent;
         }
 
+        Vector3 tangent = FacadeTangent(side);
+        Vector3 outward = FacadeOutward(side);
+        float endInset = CityDesign.AlleyWidth + CityDesign.StairTurnLandingDepth * 0.5f;
+        float minimumCross = FacadeMinimum(host, side) + endInset;
+        float maximumCross = FacadeMaximum(host, side) - endInset;
+        float landingCross = Mathf.Clamp(cross, minimumCross, maximumCross);
+        float travelSign = StairTravelSign(host, side, landingCross);
+        float landingOutwardDepth = Mathf.Max(CityDesign.StairClearWidth * 2f,
+            SurfaceLandingOutwardDepth(host, bottomFootprint, side));
+        CityRect before = Landing(host, side, landingCross,
+            CityDesign.StairTurnLandingDepth, landingOutwardDepth);
+        bool returnToNarrowTarget = !SameFootprint(host, topFootprint);
+
+        ascent.Landings.Add(before);
+        ascent.LandingY.Add(baseY);
+
+        int completedSteps = 0;
+        int flightIndex = 0;
+
+        while (completedSteps < totalSteps)
+        {
+            int capacity = StairFlightCapacity(host, side, landingCross, travelSign);
+
+            if (capacity <= 0)
+            {
+                travelSign = -travelSign;
+                capacity = StairFlightCapacity(host, side, landingCross, travelSign);
+            }
+
+            // Every authored facade can hold at least one compliant tread. Keeping this guard
+            // makes malformed future sites deterministic instead of hanging plan generation.
+            capacity = Mathf.Max(1, capacity);
+
+            int remainingSteps = totalSteps - completedSteps;
+            int flightSteps = returnToNarrowTarget && flightIndex == 0
+                ? Mathf.Min(Mathf.CeilToInt(remainingSteps * 0.5f), capacity)
+                : Mathf.Min(remainingSteps, capacity);
+            float run = flightSteps * CityDesign.StairPreferredTreadDepth;
+            Vector3 direction = tangent * travelSign;
+            float lowY = baseY + completedSteps * riser;
+            float laneOffset = CityDesign.StairClearWidth
+                * (flightIndex % 2 == 0 ? 0.5f : 1.5f);
+            Vector3 start = FacadePoint(host, side, landingCross, lowY)
+                + outward * laneOffset
+                + direction * (CityDesign.StairTurnLandingDepth * 0.5f);
+            float nextCross = landingCross
+                + travelSign * (run + CityDesign.StairTurnLandingDepth);
+            bool finalFlight = completedSteps + flightSteps == totalSteps;
+            float afterOutwardDepth = finalFlight
+                ? Mathf.Max(CityDesign.StairClearWidth * 2f,
+                    SurfaceLandingOutwardDepth(host, topFootprint, side))
+                : CityDesign.StairClearWidth * 2f;
+            CityRect after = finalFlight
+                ? ConnectingLanding(host, side, nextCross, topFootprint, afterOutwardDepth)
+                : Landing(host, side, nextCross,
+                    CityDesign.StairTurnLandingDepth, afterOutwardDepth);
+
+            StairFlightPlan flight = new StairFlightPlan(
+                $"{name.Replace(' ', '_')}_Flight_{flightIndex + 1}", start, direction,
+                flightSteps, riser, CityDesign.StairPreferredTreadDepth,
+                CityDesign.StairClearWidth, before, after,
+                CityDesign.StairTurnLandingDepth, CityDesign.StairTurnLandingDepth);
+
+            ascent.Flights.Add(flight);
+            ascent.Landings.Add(after);
+            ascent.LandingY.Add(finalFlight ? topY : flight.End.y);
+
+            completedSteps += flightSteps;
+            flightIndex++;
+            landingCross = nextCross;
+            travelSign = -travelSign;
+            before = after;
+        }
+
+        StairFlightPlan last = ascent.Flights[ascent.Flights.Count - 1];
+        ascent.FinalLanding = last.LandingAfter;
+        ascent.FinalLandingY = topY;
+
         return ascent;
+    }
+
+    private static Vector3 FacadeTangent(Facade side)
+        => side == Facade.West || side == Facade.East ? Vector3.forward : Vector3.right;
+
+    private static Vector3 FacadeOutward(Facade side)
+    {
+        switch (side)
+        {
+            case Facade.West: return Vector3.left;
+            case Facade.East: return Vector3.right;
+            case Facade.South: return Vector3.back;
+            default: return Vector3.forward;
+        }
+    }
+
+    private static Vector3 FacadePoint(CityRect host, Facade side, float cross, float y)
+    {
+        switch (side)
+        {
+            case Facade.West: return new Vector3(host.MinX, y, cross);
+            case Facade.East: return new Vector3(host.MaxX, y, cross);
+            case Facade.South: return new Vector3(cross, y, host.MinZ);
+            default: return new Vector3(cross, y, host.MaxZ);
+        }
+    }
+
+    private static float FacadeMinimum(CityRect host, Facade side)
+        => side == Facade.West || side == Facade.East ? host.MinZ : host.MinX;
+
+    private static float FacadeMaximum(CityRect host, Facade side)
+        => side == Facade.West || side == Facade.East ? host.MaxZ : host.MaxX;
+
+    private static bool SameFootprint(CityRect a, CityRect b)
+        => Mathf.Abs(a.MinX - b.MinX) <= 0.0001f
+           && Mathf.Abs(a.MaxX - b.MaxX) <= 0.0001f
+           && Mathf.Abs(a.MinZ - b.MinZ) <= 0.0001f
+           && Mathf.Abs(a.MaxZ - b.MaxZ) <= 0.0001f;
+
+    /// <summary>Chooses the side of the authored centre with more facade available.</summary>
+    private static float StairTravelSign(CityRect host, Facade side, float cross)
+    {
+        float min = FacadeMinimum(host, side);
+        float max = FacadeMaximum(host, side);
+        return max - cross >= cross - min ? 1f : -1f;
+    }
+
+    private static int StairFlightCapacity(CityRect host, Facade side, float cross, float sign)
+    {
+        float distance = sign > 0f
+            ? FacadeMaximum(host, side) - cross
+            : cross - FacadeMinimum(host, side);
+        float run = distance - CityDesign.AlleyWidth
+                    - CityDesign.StairTurnLandingDepth * 1.5f;
+        return Mathf.FloorToInt(run / CityDesign.StairPreferredTreadDepth + 0.0001f);
+    }
+
+    /// <summary>Outward reach needed for a landing to meet a surface across the host facade.</summary>
+    private static float SurfaceLandingOutwardDepth(CityRect host, CityRect surface, Facade side)
+    {
+        switch (side)
+        {
+            case Facade.West: return Mathf.Max(0f, host.MinX - surface.MaxX);
+            case Facade.East: return Mathf.Max(0f, surface.MinX - host.MaxX);
+            case Facade.South: return Mathf.Max(0f, host.MinZ - surface.MaxZ);
+            default: return Mathf.Max(0f, surface.MinZ - host.MaxZ);
+        }
     }
 
     private static CityRect Landing(CityRect host, Facade side, float cross, float width, float depth)
@@ -1187,11 +1316,33 @@ public static class CityTraversal
         }
     }
 
+    /// <summary>
+    /// Keeps the flight endpoint inside the final landing while extending that landing just far
+    /// enough along the facade to provide a full-width connection to the declared target.
+    /// </summary>
+    private static CityRect ConnectingLanding(CityRect host, Facade side, float flightCross,
+        CityRect target, float outwardDepth)
+    {
+        float half = CityDesign.StairTurnLandingDepth * 0.5f;
+        float targetMin = FacadeMinimum(target, side);
+        float targetMax = FacadeMaximum(target, side);
+        float targetCross = targetMax - targetMin >= CityDesign.StairTurnLandingDepth
+            ? Mathf.Clamp(flightCross, targetMin + half, targetMax - half)
+            : (targetMin + targetMax) * 0.5f;
+        float minimum = Mathf.Min(flightCross - half, targetCross - half);
+        float maximum = Mathf.Max(flightCross + half, targetCross + half);
+
+        return Landing(host, side, (minimum + maximum) * 0.5f,
+            maximum - minimum, outwardDepth);
+    }
+
     private static void EmitAscent(CityPlanResult plan, AscentPlan ascent, string group)
     {
+        plan.StairFlights.AddRange(ascent.Flights);
+
         for (int i = 0; i < ascent.Landings.Count; i++)
         {
-            plan.Slabs.Add(new SlabPlan($"{ascent.Name} L{i + 1}".Replace(' ', '_'), group,
+            plan.Slabs.Add(new SlabPlan($"{ascent.Name} Landing {i}".Replace(' ', '_'), group,
                 CityPieceKind.Ascent, ascent.Landings[i], ascent.LandingY[i],
                 CityDesign.AscentLandingThickness));
         }
@@ -1200,8 +1351,7 @@ public static class CityTraversal
     // ------------------------------------------------------------------ the tower spiral
 
     /// <summary>
-    /// The way up the shaft. 79.8 m at <see cref="CityDesign.AscentStepRise"/> would be 45 mantles,
-    /// which nobody would climb twice, so this is ramped instead: whole runs along each face of the
+    /// The way up the shaft. This named exception remains a ramp: whole runs along each face of the
     /// shaft with a landing at every corner, at the shallowest pitch that fits in a whole number of
     /// runs.
     /// </summary>
@@ -1293,6 +1443,7 @@ public static class CityTraversal
         {
             Name = "Tower Spiral",
             Kind = AscentKind.TowerSpiral,
+            Style = AscentTraversalStyle.Ramp,
             BottomNode = PodiumNode,
             TopNode = ShaftRoofNode,
             BaseY = baseY,
@@ -1301,11 +1452,11 @@ public static class CityTraversal
             StepRise = risePerRun,
             BottomFootprint = PodiumFootprint,
             TopFootprint = shaft,
-            IsRamped = true,
             PitchDegrees = pitch,
             SummitFootprint = summit,
             FinalLanding = CityRect.FromCentre(cx + stationX[lastStation], cz + stationZ[lastStation],
                 size, size),
+            FinalLandingY = topY,
             FootLanding = CityRect.FromCentre(cx + stationX[0], cz + stationZ[0], size, size),
             FootRunAlongZ = footAlongZ,
             FootRun = footAlongZ

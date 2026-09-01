@@ -19,7 +19,7 @@ public enum CityPieceKind
     /// <summary>Phase 6C: a skybridge deck. Collidable.</summary>
     Deck,
 
-    /// <summary>Phase 6C: one ledge of a fire escape, scaffold, riser or link stair.</summary>
+    /// <summary>Phase 6C: a landing of a fire escape, scaffold, riser or link stair.</summary>
     Ascent,
 
     /// <summary>Phase 6C: the tower crane's jib, mast and counter-jib.</summary>
@@ -166,6 +166,9 @@ public sealed class CityPlanResult
     public readonly List<BlockPlan> Blocks = new List<BlockPlan>();
     public readonly List<RampPlan> Ramps = new List<RampPlan>();
 
+    /// <summary>Canonical world-space flights consumed by the stair builder.</summary>
+    public readonly List<StairFlightPlan> StairFlights = new List<StairFlightPlan>();
+
     /// <summary>Phase 6D: the trigger volumes. Never walked on, never in anything's way.</summary>
     public readonly List<VolumePlan> Volumes = new List<VolumePlan>();
 
@@ -180,8 +183,8 @@ public sealed class CityPlanResult
 
     /// <summary>
     /// The Phase 6C traversal layer hung on this massing: the links, the ascents and the relays,
-    /// as data. Its geometry is already in the four lists above - this is the network that geometry
-    /// means. Null only if something built a plan without calling <see cref="CityPlan.Generate"/>.
+    /// as data. Its geometry is recorded in the massing lists and canonical stair flights above.
+    /// Null only if something built a plan without calling <see cref="CityPlan.Generate"/>.
     /// </summary>
     public CityTraversalResult Traversal;
 

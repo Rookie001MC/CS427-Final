@@ -187,37 +187,37 @@ public static class CityDesign
 
     // ------------------------------------------------------------------ traversal (Phase 6C)
 
-    /// <summary>
-    /// Rise of one step in a fire escape, scaffold or roof riser.
-    ///
-    /// Sits 0.2 m inside <see cref="RouteTiers.MantleStepRise"/>, so every step in an ascent is a
-    /// mantle the player definitely has rather than one they only just have. That is what makes an
-    /// ascent uniformly ORANGE: it never needs a run-up, and it never needs a lucky frame.
-    /// </summary>
-    public const float AscentStepRise = 1.8f;
+    /// <summary>Largest visible riser in any normal ascent.</summary>
+    public const float StairMaximumRiserHeight = 0.20f;
 
-    /// <summary>Along the host facade.</summary>
-    public const float AscentLandingWidth = 2.4f;
+    /// <summary>Minimum preferred horizontal depth of every visible tread.</summary>
+    public const float StairPreferredTreadDepth = 0.30f;
 
-    /// <summary>
-    /// Out from the host facade. Above the ORANGE minimum landing of 1.2 m with margin, and
-    /// shallow enough that a landing hung over a 3.5 m Old Quarter street still leaves it open.
-    /// </summary>
-    public const float AscentLandingDepth = 1.6f;
+    /// <summary>Unobstructed walking width through flights and landings.</summary>
+    public const float StairClearWidth = 1.80f;
 
-    public const float AscentLandingThickness = 0.25f;
+    /// <summary>Minimum travel depth of a landing where consecutive flights reverse.</summary>
+    public const float StairTurnLandingDepth = 1.80f;
+
+    /// <summary>Top of a stair guard above its adjacent walking surface.</summary>
+    public const float StairGuardHeight = 1.10f;
+
+    /// <summary>Depth of the future smooth collision surface below the visible tread nosings.</summary>
+    public const float StairCollisionSurfaceDepth = 0.25f;
 
     /// <summary>
-    /// Sideways offset of alternate landings. 2 x 1.3 m = 2.6 m between the centres of two
-    /// consecutive 2.4 m landings, so they clear each other by 0.2 m and the stack reads as a
-    /// zigzag rather than as a single column of shelves.
+    /// Compatibility name for reports which predate the stair-flight model. It now means one
+    /// visible riser, not a mantle ledge.
     /// </summary>
-    public const float AscentZigzag = 1.3f;
+    public const float AscentStepRise = StairMaximumRiserHeight;
 
-    /// <summary>A scaffold is the same stack with a working deck instead of a landing.</summary>
-    public const float ScaffoldLandingWidth = 4.2f;
+    /// <summary>Along the host facade. Retained for legacy validator output until integration.</summary>
+    public const float AscentLandingWidth = StairTurnLandingDepth;
 
-    public const float ScaffoldLandingDepth = 2.4f;
+    /// <summary>Out from the host facade: two adjacent clear stair lanes.</summary>
+    public const float AscentLandingDepth = StairClearWidth * 2f;
+
+    public const float AscentLandingThickness = StairCollisionSurfaceDepth;
 
     /// <summary>
     /// Skybridge deck width. Deliberately above the GREEN minimum landing depth of 3.0 m: walking
@@ -271,8 +271,8 @@ public static class CityDesign
 
     /// <summary>
     /// Steepest the spiral may run. Well inside the controller's 50 degree slope limit, and inside
-    /// the 24 degree step the walkability flood fill accepts, so the ascent is walked rather than
-    /// mantled - 79.8 m of 1.8 m steps would be 45 mantles and nobody would climb it twice.
+    /// the 24 degree step the walkability flood fill accepts. It remains the named ramp exception
+    /// to the normal stair-flight model.
     /// </summary>
     public const float TowerSpiralMaxPitch = 22f;
 
