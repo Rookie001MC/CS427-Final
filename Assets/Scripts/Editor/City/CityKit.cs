@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 /// <summary>
 /// The modular part factory for Skybound City. Phase 6B needs only the massing primitives; the
@@ -277,6 +279,208 @@ public static class CityKit
         GameObject go = Solid(parent, name, centre, size, material);
         go.transform.localRotation = Quaternion.Euler(pitchDegrees, yawDegrees, 0f);
         return go;
+    }
+
+    /// <summary>The compact hierarchy contract returned for one conventional stair flight.</summary>
+    public sealed class StairFlightBuildResult
+    {
+        public readonly GameObject Visual;
+        public readonly GameObject WalkSurface;
+        public readonly GameObject LandingBefore;
+        public readonly GameObject LandingAfter;
+        public readonly GameObject[] Guards;
+
+        internal StairFlightBuildResult(GameObject visual, GameObject walkSurface,
+            GameObject landingBefore, GameObject landingAfter, GameObject[] guards)
+        {
+            Visual = visual;
+            WalkSurface = walkSurface;
+            LandingBefore = landingBefore;
+            LandingAfter = landingAfter;
+            Guards = guards;
+        }
+    }
+
+    /// <summary>
+    /// Builds conventional visible stairs over one continuous collision ramp. The tread/riser
+    /// silhouette is one mesh and one renderer regardless of step count; the only flight collider
+    /// is the invisible inclined box. Passing the previous result's high landing into
+    /// <paramref name="landingBefore"/> lets switchback flights share one turn landing.
+    /// </summary>
+    public static StairFlightBuildResult BuildWalkableStairs(Transform parent,
+        in StairFlightPlan flight, Material visualMaterial, Material landingMaterial,
+        GameObject landingBefore = null)
+    {
+        ValidateStairFlight(flight);
+
+        Material slabMaterial = landingMaterial != null ? landingMaterial : visualMaterial;
+        GameObject lowLanding = landingBefore != null
+            ? landingBefore
+            : Slab(parent, $"{flight.Name}_Landing_Before", flight.LandingBefore,
+                flight.Start.y, CityDesign.AscentLandingThickness, slabMaterial);
+        GameObject highLanding = Slab(parent, $"{flight.Name}_Landing_After",
+            flight.LandingAfter, flight.End.y, CityDesign.AscentLandingThickness, slabMaterial);
+
+        GameObject visual = new GameObject($"{flight.Name}_Visual",
+            typeof(MeshFilter), typeof(MeshRenderer));
+        visual.transform.SetParent(parent, false);
+        visual.transform.position = flight.Start;
+        visual.transform.rotation = Quaternion.Euler(0f, FlightYaw(flight.Direction), 0f);
+
+        Mesh mesh = BuildStairMesh(flight);
+        visual.GetComponent<MeshFilter>().sharedMesh = mesh;
+        MeshRenderer renderer = visual.GetComponent<MeshRenderer>();
+        renderer.sharedMaterial = visualMaterial;
+        renderer.shadowCastingMode = ShadowCastingMode.On;
+        GameObjectUtility.SetStaticEditorFlags(visual, EnvironmentStatic);
+
+        float slopeLength = Mathf.Sqrt(flight.HorizontalRun * flight.HorizontalRun
+                                       + flight.Rise * flight.Rise);
+        Quaternion slopeRotation = Quaternion.Euler(-flight.PitchDegrees,
+            FlightYaw(flight.Direction), 0f);
+        Vector3 normal = slopeRotation * Vector3.up;
+        Vector3 surfaceMidpoint = (flight.Start + flight.End) * 0.5f;
+
+        GameObject walkSurface = new GameObject($"{flight.Name}_WalkSurface");
+        walkSurface.transform.SetParent(parent, false);
+        walkSurface.transform.SetPositionAndRotation(
+            surfaceMidpoint - normal * (CityDesign.StairCollisionSurfaceDepth * 0.5f),
+            slopeRotation);
+        BoxCollider walkCollider = walkSurface.AddComponent<BoxCollider>();
+        walkCollider.size = new Vector3(flight.ClearWidth,
+            CityDesign.StairCollisionSurfaceDepth, slopeLength);
+        GameObjectUtility.SetStaticEditorFlags(walkSurface, EnvironmentStatic);
+
+        const float railThickness = 0.10f;
+        Vector3 right = Vector3.Cross(Vector3.up, flight.Direction).normalized;
+        Vector3 railCentre = surfaceMidpoint
+                             + Vector3.up * (CityDesign.StairGuardHeight
+                                             - normal.y * railThickness * 0.5f);
+        Vector3 railSize = new Vector3(railThickness, railThickness, slopeLength);
+        float railOffset = flight.ClearWidth * 0.5f + railThickness * 0.5f;
+        GameObject leftGuard = Deco(parent, $"{flight.Name}_Guard_Left",
+            railCentre - right * railOffset, railSize, visualMaterial,
+            -flight.PitchDegrees, FlightYaw(flight.Direction));
+        GameObject rightGuard = Deco(parent, $"{flight.Name}_Guard_Right",
+            railCentre + right * railOffset, railSize, visualMaterial,
+            -flight.PitchDegrees, FlightYaw(flight.Direction));
+
+        return new StairFlightBuildResult(visual, walkSurface, lowLanding, highLanding,
+            new[] { leftGuard, rightGuard });
+    }
+
+    private static void ValidateStairFlight(in StairFlightPlan flight)
+    {
+        if (flight.StepCount <= 0 || flight.RiserHeight <= 0f
+            || flight.RiserHeight > CityDesign.StairMaximumRiserHeight + 0.0001f)
+        {
+            throw new System.ArgumentException("A stair flight needs positive risers no higher than 0.20 m.",
+                nameof(flight));
+        }
+
+        if (flight.TreadDepth < CityDesign.StairPreferredTreadDepth - 0.0001f)
+        {
+            throw new System.ArgumentException("A stair flight needs treads at least 0.30 m deep.",
+                nameof(flight));
+        }
+
+        if (flight.ClearWidth < CityDesign.StairClearWidth - 0.0001f
+            || flight.LandingBeforeDepth < CityDesign.StairTurnLandingDepth - 0.0001f
+            || flight.LandingAfterDepth < CityDesign.StairTurnLandingDepth - 0.0001f)
+        {
+            throw new System.ArgumentException(
+                "A stair flight and its turn landings need at least 1.80 m clear width.",
+                nameof(flight));
+        }
+
+        if (flight.Direction.sqrMagnitude < 0.999f
+            || flight.PitchDegrees > CityDesign.SlopeLimit + 0.0001f)
+        {
+            throw new System.ArgumentException("A stair flight needs a horizontal direction within the slope limit.",
+                nameof(flight));
+        }
+    }
+
+    private static float FlightYaw(Vector3 direction)
+        => Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+
+    private static Mesh BuildStairMesh(in StairFlightPlan flight)
+    {
+        List<Vector3> vertices = new List<Vector3>(flight.StepCount * 28 + 8);
+        List<int> triangles = new List<int>(flight.StepCount * 42 + 12);
+        float halfWidth = flight.ClearWidth * 0.5f;
+        float depth = CityDesign.StairCollisionSurfaceDepth;
+
+        for (int i = 0; i < flight.StepCount; i++)
+        {
+            float z0 = i * flight.TreadDepth;
+            float z1 = (i + 1) * flight.TreadDepth;
+            float top = (i + 1) * flight.RiserHeight;
+            float riserBottom = i == 0 ? -depth : i * flight.RiserHeight;
+            float bottom0 = i * flight.RiserHeight - depth;
+            float bottom1 = (i + 1) * flight.RiserHeight - depth;
+
+            AddQuad(vertices, triangles,
+                new Vector3(-halfWidth, top, z0), new Vector3(-halfWidth, top, z1),
+                new Vector3(halfWidth, top, z1), new Vector3(halfWidth, top, z0));
+            AddQuad(vertices, triangles,
+                new Vector3(-halfWidth, riserBottom, z0),
+                new Vector3(-halfWidth, top, z0),
+                new Vector3(halfWidth, top, z0),
+                new Vector3(halfWidth, riserBottom, z0));
+            AddQuad(vertices, triangles,
+                new Vector3(-halfWidth, bottom0, z0),
+                new Vector3(-halfWidth, bottom1, z1),
+                new Vector3(-halfWidth, top, z1),
+                new Vector3(-halfWidth, top, z0));
+            AddQuad(vertices, triangles,
+                new Vector3(halfWidth, bottom0, z0),
+                new Vector3(halfWidth, top, z0),
+                new Vector3(halfWidth, top, z1),
+                new Vector3(halfWidth, bottom1, z1));
+            AddQuad(vertices, triangles,
+                new Vector3(-halfWidth, bottom0, z0),
+                new Vector3(halfWidth, bottom0, z0),
+                new Vector3(halfWidth, bottom1, z1),
+                new Vector3(-halfWidth, bottom1, z1));
+        }
+
+        float run = flight.HorizontalRun;
+        float rise = flight.Rise;
+        AddQuad(vertices, triangles,
+            new Vector3(-halfWidth, rise - depth, run),
+            new Vector3(halfWidth, rise - depth, run),
+            new Vector3(halfWidth, rise, run),
+            new Vector3(-halfWidth, rise, run));
+
+        Mesh mesh = new Mesh { name = $"{flight.Name}_CombinedTreads" };
+
+        if (vertices.Count > ushort.MaxValue)
+        {
+            mesh.indexFormat = IndexFormat.UInt32;
+        }
+
+        mesh.SetVertices(vertices);
+        mesh.SetTriangles(triangles, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    private static void AddQuad(List<Vector3> vertices, List<int> triangles,
+        Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+    {
+        int first = vertices.Count;
+        vertices.Add(a);
+        vertices.Add(b);
+        vertices.Add(c);
+        vertices.Add(d);
+        triangles.Add(first);
+        triangles.Add(first + 1);
+        triangles.Add(first + 2);
+        triangles.Add(first);
+        triangles.Add(first + 2);
+        triangles.Add(first + 3);
     }
 
     /// <summary>

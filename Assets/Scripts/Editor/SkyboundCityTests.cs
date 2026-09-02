@@ -103,6 +103,24 @@ public sealed class SkyboundCityTests
         });
     }
 
+    private static StairFlightPlan GeometryTestFlight(string name, Vector3 start,
+        Vector3 direction, CityRect before, CityRect after, int steps = 12)
+        => new StairFlightPlan(name, start, direction, steps, 0.20f, 0.30f, 1.80f,
+            before, after, 1.80f, 1.80f);
+
+    private static void DestroyStairTestHierarchy(GameObject root)
+    {
+        foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (filter.gameObject.name.EndsWith("_Visual") && filter.sharedMesh != null)
+            {
+                Object.DestroyImmediate(filter.sharedMesh);
+            }
+        }
+
+        Object.DestroyImmediate(root);
+    }
+
     // ------------------------------------------------------------------ the grid
 
     [Test]
@@ -765,7 +783,22 @@ public sealed class SkyboundCityTests
     {
         // 1100 colliders is the whole-city ceiling. Phase 6E still has to fit inside it, so the
         // greybox and its traversal layer together must not be close to it.
-        Assert.That(Plan.ColliderCount, Is.LessThan(1100),
+        CityPlanResult plan = Plan;
+        int solidBlocks = 0;
+
+        foreach (BlockPlan block in plan.Blocks)
+        {
+            if (block.Collidable)
+            {
+                solidBlocks++;
+            }
+        }
+
+        int expected = plan.Buildings.Count + plan.Slabs.Count + solidBlocks + plan.Ramps.Count
+                       + plan.Volumes.Count + plan.StairFlights.Count;
+        Assert.That(plan.ColliderCount, Is.EqualTo(expected),
+            "Every flight adds exactly one smooth walk-surface collider.");
+        Assert.That(plan.ColliderCount, Is.LessThan(1100),
             "The greybox already exceeds the city's total collider budget.");
     }
 
@@ -943,6 +976,165 @@ public sealed class SkyboundCityTests
         }
 
         Assert.That(flights, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void StairBuilder_EmitsOneVisualMeshOverOneContinuousWalkSurface()
+    {
+        GameObject root = new GameObject("Stair Geometry Test");
+
+        try
+        {
+            CityRect before = new CityRect(-0.9f, 0.9f, -1.8f, 0f);
+            CityRect after = new CityRect(-0.9f, 0.9f, 3.6f, 5.4f);
+            StairFlightPlan flight = GeometryTestFlight("Test_Flight_1",
+                Vector3.zero, Vector3.forward, before, after);
+
+            CityKit.StairFlightBuildResult built = CityKit.BuildWalkableStairs(
+                root.transform, flight, null, null);
+
+            Assert.That(built.Visual.name, Is.EqualTo("Test_Flight_1_Visual"));
+            Assert.That(built.WalkSurface.name,
+                Is.EqualTo("Test_Flight_1_WalkSurface"));
+            Assert.That(built.Visual.GetComponentsInChildren<MeshFilter>(true).Length,
+                Is.EqualTo(1), "All 12 visible treads must share one mesh.");
+            Assert.That(built.Visual.GetComponentsInChildren<MeshRenderer>(true).Length,
+                Is.EqualTo(1), "A flight must cost one tread renderer, not one per step.");
+            Assert.That(built.Visual.GetComponentsInChildren<Collider>(true), Is.Empty,
+                "Visible tread geometry must never carry collision.");
+
+            BoxCollider walk = built.WalkSurface.GetComponent<BoxCollider>();
+            Assert.That(walk, Is.Not.Null);
+            Assert.That(built.WalkSurface.GetComponents<Collider>().Length, Is.EqualTo(1));
+            Assert.That(built.WalkSurface.GetComponent<Renderer>(), Is.Null,
+                "The smooth collision surface is intentionally invisible.");
+
+            Vector3 low = built.WalkSurface.transform.TransformPoint(
+                walk.center + new Vector3(0f, walk.size.y * 0.5f, -walk.size.z * 0.5f));
+            Vector3 high = built.WalkSurface.transform.TransformPoint(
+                walk.center + new Vector3(0f, walk.size.y * 0.5f, walk.size.z * 0.5f));
+
+            Assert.That(Vector3.Distance(low, flight.Start), Is.LessThan(0.001f),
+                "The walk surface must begin flush with the low landing.");
+            Assert.That(Vector3.Distance(high, flight.End), Is.LessThan(0.001f),
+                "The walk surface must finish flush with the high landing.");
+            Assert.That(Vector3.Angle(built.WalkSurface.transform.up, Vector3.up),
+                Is.EqualTo(flight.PitchDegrees).Within(0.001f));
+            Assert.That(flight.PitchDegrees, Is.LessThanOrEqualTo(CityDesign.SlopeLimit));
+            Assert.That(built.Guards.Length, Is.EqualTo(2));
+
+            foreach (GameObject guard in built.Guards)
+            {
+                Assert.That(guard.GetComponentsInChildren<Collider>(true), Is.Empty,
+                    "Continuous guard rails are decorative and cannot catch the controller.");
+                Vector3 guardLowTop = guard.transform.TransformPoint(
+                    new Vector3(0f, 0.5f, -0.5f));
+                Vector3 guardHighTop = guard.transform.TransformPoint(
+                    new Vector3(0f, 0.5f, 0.5f));
+                Assert.That(guardLowTop.y - flight.Start.y,
+                    Is.EqualTo(CityDesign.StairGuardHeight).Within(0.001f));
+                Assert.That(guardHighTop.y - flight.End.y,
+                    Is.EqualTo(CityDesign.StairGuardHeight).Within(0.001f));
+            }
+        }
+        finally
+        {
+            DestroyStairTestHierarchy(root);
+        }
+    }
+
+    [Test]
+    public void StairBuilder_ReusesTurnLandingAndRendererCountDoesNotScaleWithTreads()
+    {
+        GameObject root = new GameObject("Switchback Geometry Test");
+
+        try
+        {
+            CityRect bottom = new CityRect(-0.9f, 0.9f, -1.8f, 0f);
+            CityRect turn = new CityRect(-0.9f, 2.9f, 3.6f, 5.4f);
+            CityRect top = new CityRect(1.1f, 2.9f, 0f, 1.8f);
+            StairFlightPlan first = GeometryTestFlight("Test_Flight_1", Vector3.zero,
+                Vector3.forward, bottom, turn);
+            StairFlightPlan second = GeometryTestFlight("Test_Flight_2",
+                new Vector3(2f, 2.4f, 5.4f), Vector3.back, turn, top);
+
+            CityKit.StairFlightBuildResult low = CityKit.BuildWalkableStairs(
+                root.transform, first, null, null);
+            CityKit.StairFlightBuildResult high = CityKit.BuildWalkableStairs(
+                root.transform, second, null, null, low.LandingAfter);
+
+            Assert.That(high.LandingBefore, Is.SameAs(low.LandingAfter),
+                "Adjacent flights must share one turn landing collider.");
+            Assert.That(root.GetComponentsInChildren<BoxCollider>(true).Length,
+                Is.EqualTo(5), "Three unique landings plus one walk surface per flight.");
+            Assert.That(root.GetComponentsInChildren<MeshRenderer>(true).Length,
+                Is.EqualTo(9),
+                "Two 12-tread flights stay at two tread renderers plus guards and landings.");
+            Assert.That(root.GetComponentsInChildren<MeshRenderer>(true).Length,
+                Is.LessThan(first.StepCount + second.StepCount));
+        }
+        finally
+        {
+            DestroyStairTestHierarchy(root);
+        }
+    }
+
+    [Test]
+    public void CityBuilder_InstantiatesEveryPlannedFlightWithDeterministicNames()
+    {
+        System.Reflection.MethodInfo build = typeof(SkyboundCityBuilder).GetMethod("BuildStairs",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(build, Is.Not.Null,
+            "The scene builder needs a dedicated stair-flight emission pass.");
+
+        GameObject preservedWorld = GameObject.Find(CityKit.WorldRoot);
+
+        if (preservedWorld != null)
+        {
+            preservedWorld.name = "__SkyboundCityTests_PreservedWorld";
+        }
+
+        CityPlanResult plan = Plan;
+
+        try
+        {
+            build.Invoke(null, new object[] { plan });
+            GameObject world = GameObject.Find(CityKit.WorldRoot);
+            Assert.That(world, Is.Not.Null);
+
+            int visuals = 0;
+            int walkSurfaces = 0;
+
+            foreach (Transform child in world.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name.EndsWith("_Visual"))
+                {
+                    visuals++;
+                }
+
+                if (child.name.EndsWith("_WalkSurface"))
+                {
+                    walkSurfaces++;
+                }
+            }
+
+            Assert.That(visuals, Is.EqualTo(plan.StairFlights.Count));
+            Assert.That(walkSurfaces, Is.EqualTo(plan.StairFlights.Count));
+        }
+        finally
+        {
+            GameObject world = GameObject.Find(CityKit.WorldRoot);
+
+            if (world != null)
+            {
+                DestroyStairTestHierarchy(world);
+            }
+
+            if (preservedWorld != null)
+            {
+                preservedWorld.name = CityKit.WorldRoot;
+            }
+        }
     }
 
     [Test]
@@ -1762,8 +1954,8 @@ public sealed class SkyboundCityTests
 
         Assert.That(plan.ColliderCount,
             Is.EqualTo(plan.Buildings.Count + plan.Slabs.Count + solids + plan.Ramps.Count
-                       + plan.Volumes.Count),
-            "The collider count is the four built massing lists and the triggers, and nothing else. " +
+                       + plan.Volumes.Count + plan.StairFlights.Count),
+            "The collider count is the built massing, triggers, and one walk surface per flight. " +
             "If the art layer had grown a collider it would have to be here.");
 
         // And nothing the art layer emitted leaked into a list the builder makes solids out of.
@@ -1846,11 +2038,15 @@ public sealed class SkyboundCityTests
             }
         }
 
-        int renderers = massing + uprights + plan.Details.Count;
+        // One combined tread/riser mesh and two continuous decorative guards per flight. Landing
+        // slabs are already represented in plan.Slabs, and walk surfaces are renderer-free.
+        int stairRenderers = plan.StairFlights.Count * 3;
+        int renderers = massing + uprights + stairRenderers + plan.Details.Count;
 
         Assert.That(renderers, Is.LessThanOrEqualTo(3800),
-            $"{massing} massing + {uprights} scaffold uprights + {plan.Details.Count} details = " +
-            $"{renderers} renderers, against the Phase 6A ceiling of 3800.");
+            $"{massing} massing + {uprights} scaffold uprights + {stairRenderers} stair parts + " +
+            $"{plan.Details.Count} details = {renderers} renderers, against the Phase 6A ceiling " +
+            "of 3800.");
     }
 
     /// <summary>

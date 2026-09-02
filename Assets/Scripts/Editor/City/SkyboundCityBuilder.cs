@@ -90,6 +90,7 @@ public static class SkyboundCityBuilder
 
         BuildLighting();
         BuildSlabs(plan);
+        BuildStairs(plan);
         BuildBlocks(plan);
         BuildRamps(plan);
         BuildBuildings(plan);
@@ -559,14 +560,97 @@ public static class SkyboundCityBuilder
 
     private static void BuildSlabs(CityPlanResult plan)
     {
+        HashSet<string> stairLandings = WalkableStairLandingNames(plan);
+
         foreach (SlabPlan slab in plan.Slabs)
         {
+            if (stairLandings.Contains(slab.Name))
+            {
+                continue;
+            }
+
             Transform parent = CityKit.Group(slab.GroupName);
             Material material = slab.Kind == CityPieceKind.Ground
                 ? (IsAvenueSlab(slab) ? mAvenue : mGround)
                 : MaterialFor(slab.Kind);
 
             CityKit.Slab(parent, slab.Name, slab.Footprint, slab.SurfaceY, slab.Thickness, material);
+        }
+    }
+
+    /// <summary>
+    /// Instantiates every conventional flight through the one-mesh/one-collider CityKit path.
+    /// Tower spiral runs remain RampPlans and never enter this pass.
+    /// </summary>
+    private static void BuildStairs(CityPlanResult plan)
+    {
+        foreach (AscentPlan ascent in plan.Traversal.Ascents)
+        {
+            BuildStairAscent(ascent, CityTraversal.AscentGroup);
+        }
+
+        foreach (LinkPlan link in plan.Traversal.Links)
+        {
+            string group = link.Kind == LinkKind.Crane
+                ? CityTraversal.CraneGroup
+                : CityTraversal.LinkGroup;
+
+            foreach (AscentPlan stair in link.Stairs)
+            {
+                BuildStairAscent(stair, group);
+            }
+        }
+    }
+
+    private static void BuildStairAscent(AscentPlan ascent, string groupName)
+    {
+        if (ascent.Style != AscentTraversalStyle.WalkableStair)
+        {
+            return;
+        }
+
+        Transform parent = CityKit.Group(groupName);
+        CityKit.StairFlightBuildResult previous = null;
+
+        for (int i = 0; i < ascent.Flights.Count; i++)
+        {
+            previous = CityKit.BuildWalkableStairs(parent, ascent.Flights[i], mAscent, mAscent,
+                previous != null ? previous.LandingAfter : null);
+        }
+    }
+
+    private static HashSet<string> WalkableStairLandingNames(CityPlanResult plan)
+    {
+        HashSet<string> names = new HashSet<string>();
+
+        foreach (AscentPlan ascent in plan.Traversal.Ascents)
+        {
+            AddWalkableStairLandingNames(names, ascent);
+        }
+
+        foreach (LinkPlan link in plan.Traversal.Links)
+        {
+            foreach (AscentPlan stair in link.Stairs)
+            {
+                AddWalkableStairLandingNames(names, stair);
+            }
+        }
+
+        return names;
+    }
+
+    private static void AddWalkableStairLandingNames(HashSet<string> names, AscentPlan ascent)
+    {
+        if (ascent.Style != AscentTraversalStyle.WalkableStair)
+        {
+            return;
+        }
+
+        string prefix = ascent.Name.Replace(' ', '_');
+
+        for (int i = 0; i < ascent.Landings.Count; i++)
+        {
+            names.Add($"{prefix}_Landing_{i}");
         }
     }
 
@@ -636,6 +720,15 @@ public static class SkyboundCityBuilder
                 maxX = Mathf.Max(maxX, landing.MaxX);
                 minZ = Mathf.Min(minZ, landing.MinZ);
                 maxZ = Mathf.Max(maxZ, landing.MaxZ);
+            }
+
+            foreach (StairFlightPlan flight in ascent.Flights)
+            {
+                CityRect footprint = flight.Footprint;
+                minX = Mathf.Min(minX, footprint.MinX);
+                maxX = Mathf.Max(maxX, footprint.MaxX);
+                minZ = Mathf.Min(minZ, footprint.MinZ);
+                maxZ = Mathf.Max(maxZ, footprint.MaxZ);
             }
 
             float[] xs = { minX + 0.1f, maxX - 0.1f };

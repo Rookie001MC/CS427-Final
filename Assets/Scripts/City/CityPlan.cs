@@ -218,7 +218,10 @@ public sealed class CityPlanResult
             // Triggers are colliders too. They are counted because the Phase 6A budget is a
             // physics budget and the massing report measures the scene, not the plan - a number
             // here that quietly excluded triggers would stop matching what the report prints.
-            return Buildings.Count + Slabs.Count + blocks + Ramps.Count + Volumes.Count;
+            // Conventional visible treads are non-colliding. Each canonical flight contributes
+            // exactly one continuous BoxCollider through CityKit.BuildWalkableStairs.
+            return Buildings.Count + Slabs.Count + blocks + Ramps.Count + Volumes.Count
+                   + StairFlights.Count;
         }
     }
 
