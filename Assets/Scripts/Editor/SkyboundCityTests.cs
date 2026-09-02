@@ -1277,6 +1277,48 @@ public sealed class SkyboundCityTests
     }
 
     [Test]
+    public void RoofGraph_ConnectsEveryWalkableStairGreenInBothDirections()
+    {
+        CityPlanResult plan = Plan;
+        RoofGraph roofs = RoofGraph.Build(plan);
+        RoofGraph street = RoofGraph.BuildWithStreet(plan);
+
+        foreach (AscentPlan ascent in plan.Traversal.Ascents)
+        {
+            if (ascent.Style != AscentTraversalStyle.WalkableStair)
+            {
+                continue;
+            }
+
+            RoofGraph graph = ascent.FromStreet ? street : roofs;
+            string bottom = ascent.FromStreet ? RoofGraph.StreetNode : ascent.BottomNode;
+            bool up = false;
+            bool down = false;
+
+            foreach (RoofEdge edge in graph.From(bottom))
+            {
+                if (edge.To == ascent.TopNode && edge.Via == ascent.Name
+                    && edge.Tier == RouteTier.Green)
+                {
+                    up = true;
+                }
+            }
+
+            foreach (RoofEdge edge in graph.From(ascent.TopNode))
+            {
+                if (edge.To == bottom && edge.Via == ascent.Name
+                    && edge.Tier == RouteTier.Green)
+                {
+                    down = true;
+                }
+            }
+
+            Assert.That(up, Is.True, $"{ascent.Name} has no ordinary GREEN route uphill.");
+            Assert.That(down, Is.True, $"{ascent.Name} has no ordinary GREEN route downhill.");
+        }
+    }
+
+    [Test]
     public void RouteTierValidator_ReportsUnsafeStairFlightDimensions()
     {
         System.Reflection.MethodInfo check = typeof(RouteTierValidator).GetMethod("CheckAscents",
@@ -2436,7 +2478,8 @@ public sealed class SkyboundCityTests
     }
 
     /// <summary>
-    /// Every bridge deck in the city carries the lit strip that says it is a route.
+    /// Every bridge deck, conventional stair flight and stair landing carries the lit strip that
+    /// says it is a route.
     ///
     /// The traversal layer is the part of the city a player has to read at speed, and the strip is
     /// the whole of how it is signposted. One missing on one bridge is one crossing that reads as
@@ -2446,19 +2489,22 @@ public sealed class SkyboundCityTests
     public void Dressing_MarksEveryCrossingAndEveryWayUp()
     {
         CityPlanResult plan = Plan;
-        HashSet<string> strips = new HashSet<string>();
+        Dictionary<string, DetailPlan> strips = new Dictionary<string, DetailPlan>();
+        int stairFlightMarkers = 0;
 
         foreach (DetailPlan detail in Details(plan, CityDressing.TraversalGroup))
         {
             if (detail.Surface == DetailSurface.Route)
             {
-                strips.Add(detail.Name);
+                Assert.That(strips.ContainsKey(detail.Name), Is.False,
+                    $"{detail.Name} is emitted twice, so deterministic rebuilds create overlapping art.");
+                strips.Add(detail.Name, detail);
             }
         }
 
         foreach (LinkPlan link in plan.Traversal.Links)
         {
-            Assert.That(strips.Contains($"{link.Name.Replace(' ', '_')}_Route"), Is.True,
+            Assert.That(strips.ContainsKey($"{link.Name.Replace(' ', '_')}_Route"), Is.True,
                 $"{link.Name} has no route strip, so it reads as a ledge.");
         }
 
@@ -2469,9 +2515,66 @@ public sealed class SkyboundCityTests
                 continue;
             }
 
-            Assert.That(strips.Contains($"{ascent.Name.Replace(' ', '_')}_RouteFoot"), Is.True,
-                $"{ascent.Name} has no marker at its foot.");
+            for (int i = 0; i < ascent.Flights.Count; i++)
+            {
+                StairFlightPlan flight = ascent.Flights[i];
+                string routeName = $"{flight.Name}_Route";
+                stairFlightMarkers++;
+
+                Assert.That(strips.TryGetValue(routeName, out DetailPlan route), Is.True,
+                    $"{flight.Name} has no lit flight cue.");
+
+                float yaw = Mathf.Atan2(flight.Direction.x, flight.Direction.z) * Mathf.Rad2Deg;
+                float slopeLength = Mathf.Sqrt(flight.HorizontalRun * flight.HorizontalRun
+                                               + flight.Rise * flight.Rise);
+                float pitch = flight.PitchDegrees * Mathf.Deg2Rad;
+                Vector3 normal = Vector3.up * Mathf.Cos(pitch)
+                                 - flight.Direction * Mathf.Sin(pitch);
+                Vector3 right = Vector3.Cross(Vector3.up, flight.Direction).normalized;
+                Vector3 railCentre = (flight.Start + flight.End) * 0.5f
+                                     + Vector3.up * (CityDesign.StairGuardHeight
+                                                     - normal.y * CityDesign.RailThickness * 0.5f);
+                float railOffset = flight.ClearWidth * 0.5f
+                                   + CityDesign.RailThickness * 0.5f;
+                Vector3 expectedCentre = railCentre + right * railOffset
+                                         + normal * ((CityDesign.RailThickness
+                                                      + CityDesign.RouteStripRise) * 0.5f);
+
+                Assert.That(Vector3.Distance(route.Centre, expectedCentre), Is.LessThan(0.001f),
+                    $"{routeName} is not seated on its builder-owned guard.");
+                Assert.That(route.PitchDegrees,
+                    Is.EqualTo(-flight.PitchDegrees).Within(0.001f), routeName);
+                Assert.That(route.YawDegrees, Is.EqualTo(yaw).Within(0.001f), routeName);
+                Assert.That(route.Size.x,
+                    Is.EqualTo(CityDesign.RouteStripWidth).Within(0.001f), routeName);
+                Assert.That(route.Size.y,
+                    Is.EqualTo(CityDesign.RouteStripRise).Within(0.001f), routeName);
+                Assert.That(route.Size.z, Is.EqualTo(slopeLength * 0.96f).Within(0.001f),
+                    routeName);
+            }
+
+            for (int i = 0; i < ascent.Landings.Count; i++)
+            {
+                CityRect landing = ascent.Landings[i];
+                string routeName = $"{ascent.Name.Replace(' ', '_')}_LandingRoute{i}";
+
+                Assert.That(strips.TryGetValue(routeName, out DetailPlan route), Is.True,
+                    $"{ascent.Name} landing {i} has no route marker.");
+                Assert.That(route.IsRotated, Is.False, routeName);
+                Assert.That(route.Centre.x, Is.EqualTo(landing.CentreX).Within(0.001f), routeName);
+                Assert.That(route.Centre.y,
+                    Is.EqualTo(ascent.LandingY[i] + CityDesign.RouteStripRise * 0.5f)
+                        .Within(0.001f), routeName);
+                Assert.That(route.Centre.z, Is.EqualTo(landing.CentreZ).Within(0.001f), routeName);
+                Assert.That(route.Size.y,
+                    Is.EqualTo(CityDesign.RouteStripRise).Within(0.001f), routeName);
+                Assert.That(route.Footprint.GapTo(landing), Is.EqualTo(0f).Within(0.001f),
+                    $"{routeName} is not on its landing.");
+            }
         }
+
+        Assert.That(stairFlightMarkers, Is.EqualTo(plan.StairFlights.Count),
+            "Dressing must consume the same canonical flight set as the builder.");
 
         // Every run of the spiral, too - it is the only ramped ascent and the only one whose strips
         // have to follow a rotation.
@@ -2487,7 +2590,7 @@ public sealed class SkyboundCityTests
 
         int marked = 0;
 
-        foreach (string name in strips)
+        foreach (string name in strips.Keys)
         {
             if (name.StartsWith("TowerSpiral_Route"))
             {

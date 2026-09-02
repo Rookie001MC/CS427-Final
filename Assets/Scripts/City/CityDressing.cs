@@ -1239,7 +1239,8 @@ public static class CityDressing
     }
 
     /// <summary>
-    /// A rail on the outboard edge of every ledge, and a route strip at the two ends of the stack.
+    /// A rail and route strip on every landing, plus one lit cap on every stair flight's
+    /// builder-owned guard.
     ///
     /// "Outboard" is derived rather than authored: an ascent's ledges hang off the footprint it
     /// tops out on, so the direction away from that footprint's centre is the side with nothing
@@ -1256,6 +1257,28 @@ public static class CityDressing
 
         string name = ascent.Name.Replace(' ', '_');
         float t = CityDesign.RailThickness;
+
+        foreach (StairFlightPlan flight in ascent.Flights)
+        {
+            float yaw = Mathf.Atan2(flight.Direction.x, flight.Direction.z) * Mathf.Rad2Deg;
+            Vector3 normal = LocalUp(-flight.PitchDegrees, yaw);
+            Vector3 right = LocalRight(yaw);
+            float slopeLength = Mathf.Sqrt(flight.HorizontalRun * flight.HorizontalRun
+                                           + flight.Rise * flight.Rise);
+            Vector3 railCentre = (flight.Start + flight.End) * 0.5f
+                                 + Vector3.up * (CityDesign.StairGuardHeight
+                                                 - normal.y * t * 0.5f);
+            float railOffset = flight.ClearWidth * 0.5f + t * 0.5f;
+            Vector3 stripCentre = railCentre + right * railOffset
+                                  + normal * ((t + CityDesign.RouteStripRise) * 0.5f);
+
+            // CityKit owns the actual guard and the continuous walk collider. This thin emissive
+            // cap is DetailPlan art only: one renderer per flight and never another collision edge.
+            Emit(plan, result, $"{flight.Name}_Route", TraversalGroup, DetailSurface.Route,
+                DistrictGroup.Landmark, stripCentre,
+                new Vector3(CityDesign.RouteStripWidth, CityDesign.RouteStripRise,
+                    slopeLength * 0.96f), -flight.PitchDegrees, yaw);
+        }
 
         for (int i = 0; i < ascent.Landings.Count; i++)
         {
@@ -1285,6 +1308,9 @@ public static class CityDressing
                 DistrictGroup.Landmark, rail, y + CityDesign.RailHeight - t,
                 y + CityDesign.RailHeight);
 
+            RouteStrip(plan, result, $"{name}_LandingRoute{i}", ledge, y,
+                ledge.Depth >= ledge.Width);
+
             // The underside of a ledge, so a stack read from the street is a structure and not a
             // row of floating shelves. Only on the stacks that *are* read from the street: a riser
             // between two roof plateaus is looked down on, where an under-beam is invisible and
@@ -1298,14 +1324,9 @@ public static class CityDressing
             }
         }
 
-        // A marker at the foot and at the head. Only two, because a strip on every ledge would
-        // read as a ladder painted on a wall rather than as "the way up starts here".
-        CityRect first = ascent.Landings[0];
-        RouteStrip(plan, result, $"{name}_RouteFoot", first, ascent.LandingY[0],
-            first.Depth >= first.Width);
-
         if (ascent.FromStreet)
         {
+            CityRect first = ascent.Landings[0];
             CityRect mouth = CityRect.FromCentre(first.CentreX, first.CentreZ,
                 first.Width * 0.8f, first.Depth * 0.8f);
             Slab(plan, result, $"{name}_RouteMouth", TraversalGroup, DetailSurface.Route,
