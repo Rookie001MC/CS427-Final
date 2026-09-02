@@ -83,7 +83,7 @@ public sealed class SkyboundCityStairPlayModeTests
             yield return MoveThrough(controller, speed, new[]
             {
                 new Vector3(0f, 2f, 3.7f),
-                new Vector3(2f, 2f, 4.3f),
+                new Vector3(2f, 2f, 4.8f),
                 new Vector3(2f, 4f, 1.3f)
             });
             Assert.That(controller.transform.position.y, Is.GreaterThan(3.70f),
@@ -91,7 +91,7 @@ public sealed class SkyboundCityStairPlayModeTests
 
             yield return MoveThrough(controller, speed, new[]
             {
-                new Vector3(2f, 2f, 4.3f),
+                new Vector3(2f, 2f, 4.8f),
                 new Vector3(0f, 2f, 3.7f),
                 new Vector3(0f, 0f, -0.5f)
             });
