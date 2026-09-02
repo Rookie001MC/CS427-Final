@@ -14,7 +14,7 @@ public sealed class SkyboundCityStairPlayModeTests
 {
     private const float WalkSpeed = 6f;
     private const float SprintSpeed = 9f;
-    private const float WaypointRadius = 0.18f;
+    private const float LandingTolerance = 0.18f;
     private const float FatalDropY = -3f;
 
     [UnityTest]
@@ -46,7 +46,7 @@ public sealed class SkyboundCityStairPlayModeTests
             Physics.SyncTransforms();
             yield return null;
 
-            yield return MoveThrough(controller, speed, new[] { new Vector3(0f, 0f, 3.5f) });
+            yield return MoveThrough(controller, speed, new[] { new Vector3(0f, 2f, 3.5f) });
             Assert.That(controller.transform.position.y, Is.GreaterThan(1.75f),
                 "The controller did not reach the high landing.");
 
@@ -82,17 +82,17 @@ public sealed class SkyboundCityStairPlayModeTests
 
             yield return MoveThrough(controller, speed, new[]
             {
-                new Vector3(0f, 0f, 3.7f),
-                new Vector3(2f, 0f, 4.3f),
-                new Vector3(2f, 0f, 1.3f)
+                new Vector3(0f, 2f, 3.7f),
+                new Vector3(2f, 2f, 4.3f),
+                new Vector3(2f, 4f, 1.3f)
             });
             Assert.That(controller.transform.position.y, Is.GreaterThan(3.70f),
                 "The controller did not reach the tall ascent's high landing.");
 
             yield return MoveThrough(controller, speed, new[]
             {
-                new Vector3(2f, 0f, 4.3f),
-                new Vector3(0f, 0f, 3.7f),
+                new Vector3(2f, 2f, 4.3f),
+                new Vector3(0f, 2f, 3.7f),
                 new Vector3(0f, 0f, -0.5f)
             });
             Assert.That(controller.transform.position.y, Is.LessThan(0.30f),
@@ -141,15 +141,20 @@ public sealed class SkyboundCityStairPlayModeTests
             float bestDistance = float.MaxValue;
             float stuckFor = 0f;
 
-            while (HorizontalDistance(controller.transform.position, waypoint) > WaypointRadius)
+            while (!ReachedLanding(controller, waypoint))
             {
                 float delta = Mathf.Max(Time.deltaTime, 0.001f);
                 Vector3 flat = waypoint - controller.transform.position;
                 flat.y = 0f;
-                Vector3 direction = flat.sqrMagnitude > 0.0001f ? flat.normalized : Vector3.zero;
-                controller.Move((direction * speed + Vector3.down * 3f) * delta);
+                Vector3 direction = flat.magnitude > LandingTolerance
+                    ? flat.normalized
+                    : Vector3.zero;
+                // Match the normal controller: planar input follows the flight, then a separate
+                // downward sweep keeps the capsule on the smooth walk surface while it settles.
+                controller.Move(direction * Mathf.Min(speed * delta, flat.magnitude));
+                controller.Move(Vector3.down * 3f * delta);
 
-                float remaining = HorizontalDistance(controller.transform.position, waypoint);
+                float remaining = Vector3.Distance(controller.transform.position, waypoint);
                 stuckFor = remaining < bestDistance - 0.01f ? 0f : stuckFor + delta;
                 bestDistance = Mathf.Min(bestDistance, remaining);
                 timeout -= delta;
@@ -167,6 +172,14 @@ public sealed class SkyboundCityStairPlayModeTests
 
     private static float HorizontalDistance(Vector3 a, Vector3 b)
         => Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
+
+    private static bool ReachedLanding(CharacterController controller, Vector3 landing)
+    {
+        Vector3 position = controller.transform.position;
+        return controller.isGrounded
+               && HorizontalDistance(position, landing) <= LandingTolerance
+               && Mathf.Abs(position.y - landing.y) <= LandingTolerance;
+    }
 
     private static object Rect(float minX, float maxX, float minZ, float maxZ)
     {
