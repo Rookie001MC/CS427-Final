@@ -146,7 +146,7 @@ public sealed class SkyboundCityStairPlayModeTests
                 float delta = Mathf.Max(Time.deltaTime, 0.001f);
                 Vector3 flat = waypoint - controller.transform.position;
                 flat.y = 0f;
-                Vector3 direction = flat.magnitude > LandingTolerance
+                Vector3 direction = flat.sqrMagnitude > 0.0001f
                     ? flat.normalized
                     : Vector3.zero;
                 // Match the normal controller: planar input follows the flight, then a separate
