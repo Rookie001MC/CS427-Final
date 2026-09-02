@@ -58,14 +58,18 @@ public static class GameplayUIBuilder
 
         RectTransform root = (RectTransform)rootGo.transform;
 
-        GameplayHUD hud = BuildHud(root);
+        GameObject missionHud = GameObject.Find("MISSION_HUD");
+        Canvas objectiveInstrument = missionHud != null ? missionHud.GetComponent<Canvas>() : null;
+
+        GameplayHUD hud = BuildHud(root, objectiveInstrument != null);
         CountdownView countdown = BuildCountdown(root);
         CheckpointPopup popup = BuildCheckpointPopup(root);
         PauseMenuView pause = BuildPause(root);
         DeathRecoveryView deathRecovery = BuildDeathRecovery(root);
         LevelCompleteView complete = BuildLevelComplete(root);
 
-        WireController(rootGo, hud, countdown, popup, pause, deathRecovery, complete);
+        WireController(rootGo, hud, countdown, popup, pause, deathRecovery, complete,
+            objectiveInstrument);
 
         Selection.activeGameObject = rootGo;
         EditorUtility.SetDirty(rootGo);
@@ -103,12 +107,16 @@ public static class GameplayUIBuilder
 
     // ------------------------------------------------------------------ HUD
 
-    private static GameplayHUD BuildHud(RectTransform root)
+    private static GameplayHUD BuildHud(RectTransform root, bool reserveTopCentre)
     {
         RectTransform layer = Layer(root, "HUD", false, out UIPanel panel);
 
+        // Skybound owns a separate objective instrument across the top-centre band. Keep the
+        // shared run-mode readout below it; scenes without that instrument retain the reference
+        // layout from the original gameplay HUD.
+        float modeY = reserveTopCentre ? 270f : 500f;
         TMP_Text mode = Centered(layer, "Mode", "CHECKPOINT MODE", UITheme.StatLabel, UITheme.Cyan,
-            500f, 1100f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
+            modeY, 1100f, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono);
 
         // top-left: checkpoint progress
         RectTransform left = Block(layer, "CheckpointBlock", new Vector2(0f, 1f), new Vector2(48f, -44f), new Vector2(360f, 108f));
@@ -422,7 +430,7 @@ public static class GameplayUIBuilder
 
     private static void WireController(GameObject rootGo, GameplayHUD hud, CountdownView countdown,
         CheckpointPopup popup, PauseMenuView pause, DeathRecoveryView deathRecovery,
-        LevelCompleteView complete)
+        LevelCompleteView complete, Canvas objectiveInstrument)
     {
         GameManager game = Object.FindFirstObjectByType<GameManager>();
         RunTimer timer = Object.FindFirstObjectByType<RunTimer>();
@@ -467,6 +475,7 @@ public static class GameplayUIBuilder
         SetRef(controller, "pauseMenu", pause);
         SetRef(controller, "deathRecovery", deathRecovery);
         SetRef(controller, "levelComplete", complete);
+        SetRef(controller, "objectiveInstrument", objectiveInstrument);
     }
 
     // ------------------------------------------------------------------ primitives

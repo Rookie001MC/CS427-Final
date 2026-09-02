@@ -1123,6 +1123,7 @@ public static class SkyboundCityBuilder
 
         BuildMissionHud(tracker, player.transform);
         BuildRouteGuide(plan, tracker, player.transform);
+        GameplayUIBuilder.Build();
     }
 
     // ------------------------------------------------------------------ route guidance
@@ -1389,7 +1390,9 @@ public static class SkyboundCityBuilder
         GameObject rootGo = new GameObject("MISSION_HUD", typeof(Canvas), typeof(CanvasScaler));
         Canvas canvas = rootGo.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 100;
+        // The shared GameplayUI canvas is 100. Keep the persistent objective instrument below it
+        // so countdown, pause, death and completion overlays always cover the whole interface.
+        canvas.sortingOrder = 90;
 
         CanvasScaler scaler = rootGo.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

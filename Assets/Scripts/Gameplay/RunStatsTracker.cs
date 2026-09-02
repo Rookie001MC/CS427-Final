@@ -14,9 +14,11 @@ public sealed class RunStatsTracker : MonoBehaviour
     [SerializeField] private CheckpointManager checkpoints;
     [SerializeField] private LevelInfo levelInfo;
 
-    [Tooltip("Samples above this are discarded. CharacterController.velocity is derived from the " +
-             "last Move delta, so a respawn teleport reports a huge bogus speed for one frame.")]
+    [Tooltip("Samples above this are discarded so a bad traversal or teleport sample cannot " +
+             "poison the run's peak speed.")]
     [SerializeField, Min(1f)] private float plausibleSpeedCeiling = 40f;
+
+    private BasicFirstPersonController playerMovement;
 
     /// <summary>Horizontal speed in m/s. Vertical fall speed is excluded deliberately.</summary>
     public float CurrentSpeed { get; private set; }
@@ -47,9 +49,17 @@ public sealed class RunStatsTracker : MonoBehaviour
             return;
         }
 
-        Vector3 v = playerController.velocity;
-        v.y = 0f;
-        float speed = v.magnitude;
+        if (playerMovement == null)
+        {
+            playerMovement = playerController.GetComponent<BasicFirstPersonController>();
+        }
+
+        if (playerMovement == null)
+        {
+            return;
+        }
+
+        float speed = playerMovement.CurrentHorizontalSpeed;
 
         // Drop the teleport frame rather than letting it poison the run's peak.
         if (speed > plausibleSpeedCeiling)

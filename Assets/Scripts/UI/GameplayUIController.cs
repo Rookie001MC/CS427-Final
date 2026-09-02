@@ -22,6 +22,10 @@ public sealed class GameplayUIController : MonoBehaviour
     [SerializeField] private DeathRecoveryView deathRecovery;
     [SerializeField] private LevelCompleteView levelComplete;
 
+    [Header("Level-owned HUD")]
+    [Tooltip("Optional objective instrument that remains separate from the shared HUD.")]
+    [SerializeField] private Canvas objectiveInstrument;
+
     private void OnEnable()
     {
         if (game != null)
@@ -197,6 +201,11 @@ public sealed class GameplayUIController : MonoBehaviour
 
     private void HandleStateChanged(RunState state)
     {
+        if (objectiveInstrument != null)
+        {
+            objectiveInstrument.enabled = state == RunState.Running;
+        }
+
         if (hud != null)
         {
             hud.SetVisible(state == RunState.Running ||

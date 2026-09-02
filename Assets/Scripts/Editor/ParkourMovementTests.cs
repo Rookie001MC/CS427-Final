@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -79,6 +80,40 @@ public sealed class ParkourMovementTests
 
         Assert.That(coarse, Is.EqualTo(closedForm).Within(0.0001f));
         Assert.That(fine, Is.EqualTo(closedForm).Within(0.0001f));
+    }
+
+    [Test]
+    public void RunStatsTracker_UsesMovementStateHorizontalSpeed()
+    {
+        GameObject player = new GameObject("Stats Player", typeof(CharacterController),
+            typeof(BasicFirstPersonController));
+        GameObject systems = new GameObject("Stats Systems", typeof(RunStatsTracker));
+        spawned.Add(player);
+        spawned.Add(systems);
+
+        BasicFirstPersonController movement = player.GetComponent<BasicFirstPersonController>();
+        CharacterController characterController = player.GetComponent<CharacterController>();
+        RunStatsTracker stats = systems.GetComponent<RunStatsTracker>();
+
+        PropertyInfo speed = typeof(BasicFirstPersonController).GetProperty(
+            nameof(BasicFirstPersonController.CurrentHorizontalSpeed));
+        Assert.That(speed, Is.Not.Null);
+        MethodInfo setSpeed = speed.GetSetMethod(true);
+        Assert.That(setSpeed, Is.Not.Null);
+        setSpeed.Invoke(movement, new object[] { 7.25f });
+
+        FieldInfo playerController = typeof(RunStatsTracker).GetField("playerController",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(playerController, Is.Not.Null);
+        playerController.SetValue(stats, characterController);
+
+        MethodInfo update = typeof(RunStatsTracker).GetMethod("Update",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(update, Is.Not.Null);
+        update.Invoke(stats, null);
+
+        Assert.That(stats.CurrentSpeed, Is.EqualTo(7.25f).Within(0.001f),
+            "Run stats must read the horizontal speed produced by the movement state machine.");
     }
 
     private static float SimulateApex(float dt)

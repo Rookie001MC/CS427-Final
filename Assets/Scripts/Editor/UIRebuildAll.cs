@@ -20,18 +20,16 @@ public static class UIRebuildAll
     public static readonly string[] GameplayScenes =
     {
         "Assets/Scenes/IndustrialParkour.unity",
-        "Assets/Scenes/UIWorldDemo.unity"
+        "Assets/Scenes/UIWorldDemo.unity",
+        SkyboundCityBuilder.ScenePath
     };
 
     /// <summary>
     /// Every scene the typography audit has to cover.
     ///
-    /// SkyboundCity is audited but deliberately not rebuilt: its HUD is not a GameplayUI root, it is
-    /// built by `SkyboundCityBuilder` along with the city, and running `GameplayUIBuilder` against
-    /// it would drop a second HUD into a level that does not have one yet. Auditing it is still
-    /// worth doing from Phase 6E on - the mission readout is now drawn to `UITheme` like every other
-    /// surface in the game, so it should be held to the same legibility floor. Missing scenes are
-    /// skipped, so this is harmless before the scene exists.
+    /// SkyboundCity carries both a shared GameplayUI root and its distinct mission instrument, so
+    /// both surfaces are audited against the same typography floor. Missing scenes are skipped,
+    /// which keeps this harmless before a generated scene exists.
     /// </summary>
     public static readonly string[] AllUIScenes =
     {
