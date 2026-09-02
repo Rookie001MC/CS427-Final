@@ -1080,6 +1080,82 @@ public sealed class SkyboundCityTests
     }
 
     [Test]
+    public void StairBuilder_PreservesWorldSpaceContractUnderTransformedParent()
+    {
+        GameObject root = new GameObject("Transformed Stair Geometry Test");
+        root.transform.position = new Vector3(17f, 3f, -11f);
+        root.transform.rotation = Quaternion.Euler(0f, 37f, 0f);
+        root.transform.localScale = Vector3.one * 1.5f;
+
+        try
+        {
+            CityRect before = new CityRect(2.2f, 4f, 5.1f, 6.9f);
+            CityRect after = new CityRect(7.6f, 9.4f, 5.1f, 6.9f);
+            StairFlightPlan flight = GeometryTestFlight("World_Flight_1",
+                new Vector3(4f, 2f, 6f), Vector3.right, before, after);
+
+            CityKit.StairFlightBuildResult built = CityKit.BuildWalkableStairs(
+                root.transform, flight, null, null);
+
+            foreach (GameObject child in new[]
+                     {
+                         built.Visual, built.WalkSurface, built.LandingBefore,
+                         built.LandingAfter, built.Guards[0], built.Guards[1]
+                     })
+            {
+                Assert.That(child.transform.parent, Is.SameAs(root.transform), child.name);
+            }
+
+            Assert.That(Vector3.Distance(built.Visual.transform.position, flight.Start),
+                Is.LessThan(0.001f));
+            Assert.That(Vector3.Angle(built.Visual.transform.forward, flight.Direction),
+                Is.LessThan(0.001f));
+            Assert.That(Vector3.Distance(built.Visual.transform.lossyScale, Vector3.one),
+                Is.LessThan(0.001f),
+                "The combined mesh uses authored world dimensions even below a scaled parent.");
+
+            BoxCollider walk = built.WalkSurface.GetComponent<BoxCollider>();
+            Vector3 walkLow = built.WalkSurface.transform.TransformPoint(
+                walk.center + new Vector3(0f, walk.size.y * 0.5f, -walk.size.z * 0.5f));
+            Vector3 walkHigh = built.WalkSurface.transform.TransformPoint(
+                walk.center + new Vector3(0f, walk.size.y * 0.5f, walk.size.z * 0.5f));
+            Assert.That(Vector3.Distance(walkLow, flight.Start), Is.LessThan(0.001f));
+            Assert.That(Vector3.Distance(walkHigh, flight.End), Is.LessThan(0.001f));
+
+            BoxCollider lowLanding = built.LandingBefore.GetComponent<BoxCollider>();
+            BoxCollider highLanding = built.LandingAfter.GetComponent<BoxCollider>();
+            Assert.That(lowLanding.bounds.center.x,
+                Is.EqualTo(before.CentreX).Within(0.001f));
+            Assert.That(lowLanding.bounds.center.z,
+                Is.EqualTo(before.CentreZ).Within(0.001f));
+            Assert.That(lowLanding.bounds.max.y,
+                Is.EqualTo(flight.Start.y).Within(0.001f));
+            Assert.That(highLanding.bounds.center.x,
+                Is.EqualTo(after.CentreX).Within(0.001f));
+            Assert.That(highLanding.bounds.center.z,
+                Is.EqualTo(after.CentreZ).Within(0.001f));
+            Assert.That(highLanding.bounds.max.y,
+                Is.EqualTo(flight.End.y).Within(0.001f));
+
+            foreach (GameObject guard in built.Guards)
+            {
+                Vector3 guardLowTop = guard.transform.TransformPoint(
+                    new Vector3(0f, 0.5f, -0.5f));
+                Vector3 guardHighTop = guard.transform.TransformPoint(
+                    new Vector3(0f, 0.5f, 0.5f));
+                Assert.That(guardLowTop.y - flight.Start.y,
+                    Is.EqualTo(CityDesign.StairGuardHeight).Within(0.001f));
+                Assert.That(guardHighTop.y - flight.End.y,
+                    Is.EqualTo(CityDesign.StairGuardHeight).Within(0.001f));
+            }
+        }
+        finally
+        {
+            DestroyStairTestHierarchy(root);
+        }
+    }
+
+    [Test]
     public void CityBuilder_InstantiatesEveryPlannedFlightWithDeterministicNames()
     {
         System.Reflection.MethodInfo build = typeof(SkyboundCityBuilder).GetMethod("BuildStairs",
@@ -1095,6 +1171,15 @@ public sealed class SkyboundCityTests
         }
 
         CityPlanResult plan = Plan;
+        int expectedLandings = 0;
+
+        foreach (AscentPlan ascent in plan.Traversal.Ascents)
+        {
+            if (ascent.Style == AscentTraversalStyle.WalkableStair)
+            {
+                expectedLandings += ascent.Flights.Count + 1;
+            }
+        }
 
         try
         {
@@ -1102,24 +1187,38 @@ public sealed class SkyboundCityTests
             GameObject world = GameObject.Find(CityKit.WorldRoot);
             Assert.That(world, Is.Not.Null);
 
-            int visuals = 0;
-            int walkSurfaces = 0;
+            HashSet<string> visuals = new HashSet<string>();
+            HashSet<string> walkSurfaces = new HashSet<string>();
 
             foreach (Transform child in world.GetComponentsInChildren<Transform>(true))
             {
                 if (child.name.EndsWith("_Visual"))
                 {
-                    visuals++;
+                    Assert.That(visuals.Add(child.name), Is.True,
+                        $"Duplicate visual hierarchy entry: {child.name}");
                 }
 
                 if (child.name.EndsWith("_WalkSurface"))
                 {
-                    walkSurfaces++;
+                    Assert.That(walkSurfaces.Add(child.name), Is.True,
+                        $"Duplicate walk-surface hierarchy entry: {child.name}");
                 }
             }
 
-            Assert.That(visuals, Is.EqualTo(plan.StairFlights.Count));
-            Assert.That(walkSurfaces, Is.EqualTo(plan.StairFlights.Count));
+            Assert.That(visuals.Count, Is.EqualTo(plan.StairFlights.Count));
+            Assert.That(walkSurfaces.Count, Is.EqualTo(plan.StairFlights.Count));
+            Assert.That(world.GetComponentsInChildren<BoxCollider>(true).Length,
+                Is.EqualTo(plan.StairFlights.Count + expectedLandings),
+                "Every canonical flight has one walk collider and every ascent has N+1 landings.");
+            Assert.That(world.GetComponentsInChildren<MeshRenderer>(true).Length,
+                Is.EqualTo(plan.StairFlights.Count * 3 + expectedLandings),
+                "Each flight has one combined visual, two guards and no per-tread renderer.");
+
+            foreach (StairFlightPlan flight in plan.StairFlights)
+            {
+                Assert.That(visuals, Does.Contain($"{flight.Name}_Visual"));
+                Assert.That(walkSurfaces, Does.Contain($"{flight.Name}_WalkSurface"));
+            }
         }
         finally
         {

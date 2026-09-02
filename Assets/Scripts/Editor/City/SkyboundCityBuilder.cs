@@ -586,20 +586,25 @@ public static class SkyboundCityBuilder
     {
         foreach (AscentPlan ascent in plan.Traversal.Ascents)
         {
-            BuildStairAscent(ascent, CityTraversal.AscentGroup);
+            BuildStairAscent(ascent, StairGroup(plan, ascent));
         }
+    }
 
+    private static string StairGroup(CityPlanResult plan, AscentPlan ascent)
+    {
         foreach (LinkPlan link in plan.Traversal.Links)
         {
-            string group = link.Kind == LinkKind.Crane
+            if (!link.Stairs.Contains(ascent))
+            {
+                continue;
+            }
+
+            return link.Kind == LinkKind.Crane
                 ? CityTraversal.CraneGroup
                 : CityTraversal.LinkGroup;
-
-            foreach (AscentPlan stair in link.Stairs)
-            {
-                BuildStairAscent(stair, group);
-            }
         }
+
+        return CityTraversal.AscentGroup;
     }
 
     private static void BuildStairAscent(AscentPlan ascent, string groupName)
@@ -626,14 +631,6 @@ public static class SkyboundCityBuilder
         foreach (AscentPlan ascent in plan.Traversal.Ascents)
         {
             AddWalkableStairLandingNames(names, ascent);
-        }
-
-        foreach (LinkPlan link in plan.Traversal.Links)
-        {
-            foreach (AscentPlan stair in link.Stairs)
-            {
-                AddWalkableStairLandingNames(names, stair);
-            }
         }
 
         return names;

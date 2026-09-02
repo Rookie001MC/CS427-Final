@@ -175,7 +175,8 @@ public static class CityKit
     /// <summary>Collidable box. Use for anything the player may stand on, land on or hit.</summary>
     public static GameObject Solid(Transform parent, string name, Vector3 centre, Vector3 size,
         Material material)
-        => Primitive(parent, name, centre, size, material, keepCollider: true);
+        => Primitive(parent, name, centre, size, material, keepCollider: true,
+            Quaternion.identity);
 
     /// <summary>
     /// Decoration. The collider is destroyed, so it can never catch a falling player, block a
@@ -183,7 +184,8 @@ public static class CityKit
     /// </summary>
     public static GameObject Deco(Transform parent, string name, Vector3 centre, Vector3 size,
         Material material)
-        => Primitive(parent, name, centre, size, material, keepCollider: false);
+        => Primitive(parent, name, centre, size, material, keepCollider: false,
+            Quaternion.identity);
 
     /// <summary>
     /// Decoration that is not axis-aligned: the crane's ties, the rails and route strips on the
@@ -192,11 +194,8 @@ public static class CityKit
     /// </summary>
     public static GameObject Deco(Transform parent, string name, Vector3 centre, Vector3 size,
         Material material, float pitchDegrees, float yawDegrees)
-    {
-        GameObject go = Primitive(parent, name, centre, size, material, keepCollider: false);
-        go.transform.localRotation = Quaternion.Euler(pitchDegrees, yawDegrees, 0f);
-        return go;
-    }
+        => Primitive(parent, name, centre, size, material, keepCollider: false,
+            Quaternion.Euler(pitchDegrees, yawDegrees, 0f));
 
     /// <summary>
     /// Phase 6E's one call. Named for what it is - a piece of art - because the rule that matters
@@ -210,13 +209,11 @@ public static class CityKit
             : Deco(parent, detail.Name, detail.Centre, detail.Size, material);
 
     private static GameObject Primitive(Transform parent, string name, Vector3 centre, Vector3 size,
-        Material material, bool keepCollider)
+        Material material, bool keepCollider, Quaternion rotation)
     {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = name;
-        go.transform.SetParent(parent, false);
-        go.transform.localPosition = centre;
-        go.transform.localScale = size;
+        PlaceWorld(go.transform, parent, centre, rotation, size);
 
         MeshRenderer renderer = go.GetComponent<MeshRenderer>();
 
@@ -238,6 +235,18 @@ public static class CityKit
 
         GameObjectUtility.SetStaticEditorFlags(go, EnvironmentStatic);
         return go;
+    }
+
+    /// <summary>
+    /// City plans author geometry in world space. Set the complete world transform before parenting
+    /// so a translated, rotated or uniformly scaled hierarchy cannot reinterpret those coordinates.
+    /// </summary>
+    private static void PlaceWorld(Transform target, Transform parent, Vector3 position,
+        Quaternion rotation, Vector3 scale)
+    {
+        target.SetPositionAndRotation(position, rotation);
+        target.localScale = scale;
+        target.SetParent(parent, true);
     }
 
     // ------------------------------------------------------------------ city shapes
@@ -275,11 +284,8 @@ public static class CityKit
     /// </summary>
     public static GameObject Ramp(Transform parent, string name, Vector3 centre, Vector3 size,
         float pitchDegrees, Material material, float yawDegrees = 0f)
-    {
-        GameObject go = Solid(parent, name, centre, size, material);
-        go.transform.localRotation = Quaternion.Euler(pitchDegrees, yawDegrees, 0f);
-        return go;
-    }
+        => Primitive(parent, name, centre, size, material, keepCollider: true,
+            Quaternion.Euler(pitchDegrees, yawDegrees, 0f));
 
     /// <summary>The compact hierarchy contract returned for one conventional stair flight.</summary>
     public sealed class StairFlightBuildResult
@@ -323,9 +329,8 @@ public static class CityKit
 
         GameObject visual = new GameObject($"{flight.Name}_Visual",
             typeof(MeshFilter), typeof(MeshRenderer));
-        visual.transform.SetParent(parent, false);
-        visual.transform.position = flight.Start;
-        visual.transform.rotation = Quaternion.Euler(0f, FlightYaw(flight.Direction), 0f);
+        PlaceWorld(visual.transform, parent, flight.Start,
+            Quaternion.Euler(0f, FlightYaw(flight.Direction), 0f), Vector3.one);
 
         Mesh mesh = BuildStairMesh(flight);
         visual.GetComponent<MeshFilter>().sharedMesh = mesh;
@@ -342,10 +347,9 @@ public static class CityKit
         Vector3 surfaceMidpoint = (flight.Start + flight.End) * 0.5f;
 
         GameObject walkSurface = new GameObject($"{flight.Name}_WalkSurface");
-        walkSurface.transform.SetParent(parent, false);
-        walkSurface.transform.SetPositionAndRotation(
+        PlaceWorld(walkSurface.transform, parent,
             surfaceMidpoint - normal * (CityDesign.StairCollisionSurfaceDepth * 0.5f),
-            slopeRotation);
+            slopeRotation, Vector3.one);
         BoxCollider walkCollider = walkSurface.AddComponent<BoxCollider>();
         walkCollider.size = new Vector3(flight.ClearWidth,
             CityDesign.StairCollisionSurfaceDepth, slopeLength);
