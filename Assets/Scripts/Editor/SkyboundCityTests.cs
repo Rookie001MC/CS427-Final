@@ -1096,6 +1096,7 @@ public sealed class SkyboundCityTests
 
             CityKit.StairFlightBuildResult built = CityKit.BuildWalkableStairs(
                 root.transform, flight, null, null);
+            Physics.SyncTransforms();
 
             foreach (GameObject child in new[]
                      {
