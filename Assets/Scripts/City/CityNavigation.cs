@@ -1211,9 +1211,15 @@ public static class CityNavigation
             default: kind = "tower spiral"; break;
         }
 
-        return ascent.IsRamped
-            ? $"the {name} ({kind}, {ascent.Rise:F0} m at {ascent.PitchDegrees:F0} degrees)"
-            : $"the {name} ({kind}, {ascent.StepCount} mantles of {ascent.StepRise:F1} m)";
+        if (ascent.Style == AscentTraversalStyle.Ramp)
+        {
+            return $"the {name} ({kind}, {ascent.Rise:F0} m at " +
+                   $"{ascent.PitchDegrees:F0} degrees)";
+        }
+
+        string flights = ascent.Flights.Count == 1 ? "stair flight" : "stair flights";
+        return $"the {name} ({kind}, {ascent.Flights.Count} {flights}, " +
+               $"{ascent.StepCount} steps with {ascent.StepRise:F2} m risers)";
     }
 
     private static string Deck(CityPlanResult plan, string name)

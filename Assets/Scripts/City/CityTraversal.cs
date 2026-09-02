@@ -32,13 +32,13 @@ public enum AscentKind
     /// <summary>Street to roof, on the Industrial Construction site. Wider decks.</summary>
     Scaffold,
 
-    /// <summary>Roof to roof, where the step between two plateaus is past a mantle.</summary>
+    /// <summary>Roof to roof, where a dedicated stair connects two plateaus.</summary>
     Riser,
 
     /// <summary>Deck to roof, or roof to deck: the piece a link needs at its taller end.</summary>
     LinkStair,
 
-    /// <summary>The ramped spiral up the tower shaft. Walked, not mantled.</summary>
+    /// <summary>The ramped spiral up the tower shaft.</summary>
     TowerSpiral
 }
 
@@ -223,23 +223,6 @@ public readonly struct RelaySite
     }
 }
 
-/// <summary>One measured step of an ascent, ready to be graded.</summary>
-public readonly struct AscentStep
-{
-    public readonly float Gap;
-    public readonly float Rise;
-    public readonly float LandingDepth;
-
-    public AscentStep(float gap, float rise, float landingDepth)
-    {
-        Gap = gap;
-        Rise = rise;
-        LandingDepth = landingDepth;
-    }
-
-    public RouteTier Tier => RouteTiers.Classify(Gap, Rise, LandingDepth);
-}
-
 /// <summary>A resolved ascent and its canonical world-space traversal geometry.</summary>
 public sealed class AscentPlan
 {
@@ -299,11 +282,6 @@ public sealed class AscentPlan
 
     public float Rise => TopY - BaseY;
 
-    /// <summary>Legacy jump/mantle measurements; continuously walkable ascents expose none.</summary>
-    public IEnumerable<AscentStep> Steps()
-    {
-        yield break;
-    }
 }
 
 /// <summary>A resolved crossing: the deck, the two ends, and the stair the taller end needs.</summary>
@@ -1128,7 +1106,7 @@ public static class CityTraversal
     {
         float rise = topY - baseY;
         int totalSteps = Mathf.Max(0,
-            Mathf.CeilToInt(rise / CityDesign.StairMaximumRiserHeight - 0.0001f));
+            Mathf.CeilToInt(rise / CityDesign.StairMaximumRiserHeight));
         float riser = totalSteps > 0 ? rise / totalSteps : 0f;
 
         AscentPlan ascent = new AscentPlan

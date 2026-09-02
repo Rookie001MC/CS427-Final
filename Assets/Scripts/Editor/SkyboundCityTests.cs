@@ -56,6 +56,53 @@ public sealed class SkyboundCityTests
             Is.GreaterThanOrEqualTo(CityDesign.StairClearWidth - 0.0001f), message);
     }
 
+    private static AscentPlan TestStair(float riser = 0.20f, float tread = 0.30f,
+        float width = 1.80f, float beforeDepth = 1.80f, float afterDepth = 1.80f)
+    {
+        CityRect before = new CityRect(-0.9f, 0.9f, -1.8f, 0f);
+        CityRect after = new CityRect(-0.9f, 0.9f, tread, tread + 1.8f);
+        StairFlightPlan flight = new StairFlightPlan("Test_Flight", new Vector3(0f, 0f, 0f),
+            Vector3.forward, 1, riser, tread, width, before, after,
+            beforeDepth, afterDepth);
+        AscentPlan ascent = new AscentPlan
+        {
+            Name = "Test Stair",
+            Kind = AscentKind.Riser,
+            Style = AscentTraversalStyle.WalkableStair,
+            BottomNode = "Bottom",
+            TopNode = "Top",
+            BaseY = 0f,
+            TopY = riser,
+            StepCount = 1,
+            StepRise = riser,
+            BottomFootprint = before,
+            TopFootprint = after,
+            FinalLanding = after,
+            FinalLandingY = riser
+        };
+
+        ascent.Flights.Add(flight);
+        ascent.Landings.Add(before);
+        ascent.LandingY.Add(0f);
+        ascent.Landings.Add(after);
+        ascent.LandingY.Add(riser);
+        return ascent;
+    }
+
+    private static AscentPlan PlanTestStair(float rise)
+    {
+        System.Reflection.MethodInfo planner = typeof(CityTraversal).GetMethod("PlanStair",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(planner, Is.Not.Null);
+
+        CityRect host = new CityRect(-20f, 20f, -20f, 20f);
+        return (AscentPlan)planner.Invoke(null, new object[]
+        {
+            "Ceiling Boundary Stair", AscentKind.Riser, "Bottom", "Top",
+            host, 0f, host, rise, host, Facade.North, 0f
+        });
+    }
+
     // ------------------------------------------------------------------ the grid
 
     [Test]
@@ -865,7 +912,7 @@ public sealed class SkyboundCityTests
             }
 
             int expectedSteps = Mathf.CeilToInt(
-                ascent.Rise / CityDesign.StairMaximumRiserHeight - 0.0001f);
+                ascent.Rise / CityDesign.StairMaximumRiserHeight);
             int plannedSteps = 0;
 
             for (int i = 0; i < ascent.Flights.Count; i++)
@@ -896,6 +943,76 @@ public sealed class SkyboundCityTests
         }
 
         Assert.That(flights, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void Ascents_RiseJustAboveAnExactRiserMultipleAddsAnotherStep()
+    {
+        AscentPlan ascent = PlanTestStair(1.00001f);
+
+        Assert.That(ascent.StepCount, Is.EqualTo(6),
+            "ceil(1.00001 / 0.20) is six; tolerance must not under-count safety steps.");
+        Assert.That(ascent.StepRise, Is.LessThanOrEqualTo(CityDesign.StairMaximumRiserHeight));
+
+        foreach (StairFlightPlan flight in ascent.Flights)
+        {
+            Assert.That(flight.RiserHeight,
+                Is.LessThanOrEqualTo(CityDesign.StairMaximumRiserHeight));
+        }
+    }
+
+    [Test]
+    public void RoofGraph_RejectsUnsafeWalkableStairFlights()
+    {
+        AscentPlan valid = TestStair();
+        Assert.That(RoofGraph.WorstStep(valid), Is.EqualTo(RouteTier.Green));
+
+        AscentPlan empty = TestStair();
+        empty.Flights.Clear();
+
+        foreach (AscentPlan invalid in new[]
+                 {
+                     empty,
+                     TestStair(riser: 0.20001f),
+                     TestStair(tread: 0.29999f),
+                     TestStair(width: 1.79999f),
+                     TestStair(afterDepth: 1.79999f)
+                 })
+        {
+            Assert.That(RoofGraph.WorstStep(invalid), Is.EqualTo(RouteTier.Unreachable),
+                $"{invalid.Name} was accepted without safe explicit flight geometry.");
+        }
+    }
+
+    [Test]
+    public void RouteTierValidator_ReportsUnsafeStairFlightDimensions()
+    {
+        System.Reflection.MethodInfo check = typeof(RouteTierValidator).GetMethod("CheckAscents",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(check, Is.Not.Null);
+
+        AscentPlan empty = TestStair();
+        empty.Flights.Clear();
+        AscentPlan[] invalid =
+        {
+            empty,
+            TestStair(riser: 0.20001f),
+            TestStair(tread: 0.29999f),
+            TestStair(width: 1.79999f),
+            TestStair(afterDepth: 1.79999f)
+        };
+        string[] expectedMessages = { "no explicit", "riser", "tread", "clear width", "landing" };
+
+        for (int i = 0; i < invalid.Length; i++)
+        {
+            CityPlanResult plan = new CityPlanResult { Traversal = new CityTraversalResult() };
+            plan.Traversal.Ascents.Add(invalid[i]);
+            System.Text.StringBuilder report = new System.Text.StringBuilder();
+            int failures = (int)check.Invoke(null, new object[] { report, plan });
+
+            Assert.That(failures, Is.GreaterThan(0));
+            Assert.That(report.ToString(), Does.Contain(expectedMessages[i]));
+        }
     }
 
     [Test]
@@ -953,14 +1070,6 @@ public sealed class SkyboundCityTests
             AssertWalkableConnection(ascent.FinalLanding, ascent.TopFootprint,
                 $"{ascent.Name} final landing does not connect to its target slab.");
 
-            int mantleSteps = 0;
-            foreach (AscentStep unused in ascent.Steps())
-            {
-                mantleSteps++;
-            }
-
-            Assert.That(mantleSteps, Is.EqualTo(0),
-                $"{ascent.Name} still exposes a mantle-only traversal path.");
         }
     }
 
@@ -1214,8 +1323,8 @@ public sealed class SkyboundCityTests
             Assert.That(measured, Is.LessThanOrEqualTo(route.Tier),
                 $"{route.Name} measures {measured} but is declared {route.Tier}.");
             Assert.That(measured, Is.LessThanOrEqualTo(RouteTier.Orange),
-                $"{route.Name} measures {measured}. Every ascent in the city is a mantle, so a " +
-                "rooftop route that grades RED is a design error rather than a hard route.");
+                $"{route.Name} measures {measured}. Planned stairs and the tower ramp are GREEN, " +
+                "so a rooftop route that grades RED is a design error rather than a hard route.");
         }
 
         Assert.That(rooftopRoutes, Is.EqualTo(CityTraversal.RoofRoutes.Length));
@@ -2068,8 +2177,8 @@ public sealed class SkyboundCityTests
                 $"{ascent.Name} has no marker at its foot.");
         }
 
-        // Every run of the spiral, too - it is the one ascent that is walked rather than mantled,
-        // and the only one whose strips have to follow a rotation.
+        // Every run of the spiral, too - it is the only ramped ascent and the only one whose strips
+        // have to follow a rotation.
         int runs = 0;
 
         foreach (RampPlan ramp in plan.Ramps)
@@ -2314,6 +2423,31 @@ public sealed class SkyboundCityTests
         List<string> ids = new List<string>(nav.Targets.Keys);
         ids.Sort(System.StringComparer.Ordinal);
         return ids;
+    }
+
+    [Test]
+    public void Guidance_DescribesWalkableAscentsAsStairsNotMantles()
+    {
+        CityPlanResult plan = Plan;
+        CityNavigation.Result nav = Nav(plan);
+        AscentPlan ascent = null;
+
+        foreach (AscentPlan candidate in plan.Traversal.StreetAscents())
+        {
+            ascent = candidate;
+            break;
+        }
+
+        Assert.That(ascent, Is.Not.Null);
+        int from = nav.Graph.IndexOf(CityNavigation.FootPrefix + ascent.Name);
+        int to = nav.Graph.IndexOf(ascent.TopNode);
+        List<int> path = nav.Graph.Path(from, to);
+        List<string> description = CityNavigation.Describe(plan, nav, path);
+        string text = string.Join("\n", description);
+
+        Assert.That(text, Does.Contain("stair"));
+        Assert.That(text, Does.Contain("steps"));
+        Assert.That(text, Does.Not.Contain("mantle"));
     }
 
     [Test]

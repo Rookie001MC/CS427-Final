@@ -185,28 +185,92 @@ public sealed class RoofGraph
     /// <summary>The pavement, as one node. Phase 6B proved the whole of it is walkable.</summary>
     public const string StreetNode = "STREET";
 
-    /// <summary>The hardest step in an ascent, which is what the whole ascent grades at.</summary>
+    /// <summary>
+    /// Grades an ascent from its explicit traversal geometry. Walkable stairs are GREEN only when
+    /// every flight satisfies the stair envelope and the flights form one continuous climb.
+    /// Malformed stair plans are not routes.
+    /// </summary>
     public static RouteTier WorstStep(AscentPlan ascent)
     {
-        if (ascent.IsRamped)
+        if (ascent == null)
         {
-            return RouteTier.Green;
+            return RouteTier.Unreachable;
         }
 
-        RouteTier worst = RouteTier.Green;
-
-        foreach (AscentStep step in ascent.Steps())
+        if (ascent.Style == AscentTraversalStyle.Ramp)
         {
-            RouteTier tier = step.Tier;
+            return ascent.Kind == AscentKind.TowerSpiral
+                ? RouteTier.Green
+                : RouteTier.Unreachable;
+        }
 
-            if (tier > worst)
+        if (ascent.Style != AscentTraversalStyle.WalkableStair
+            || ascent.Kind == AscentKind.TowerSpiral
+            || ascent.StepCount <= 0
+            || ascent.StepRise <= 0f
+            || ascent.StepRise > CityDesign.StairMaximumRiserHeight
+            || ascent.Flights.Count == 0)
+        {
+            return RouteTier.Unreachable;
+        }
+
+        int steps = 0;
+        float rise = 0f;
+
+        for (int i = 0; i < ascent.Flights.Count; i++)
+        {
+            StairFlightPlan flight = ascent.Flights[i];
+
+            if (flight.StepCount <= 0
+                || flight.RiserHeight <= 0f
+                || flight.RiserHeight > CityDesign.StairMaximumRiserHeight
+                || flight.TreadDepth < CityDesign.StairPreferredTreadDepth
+                || flight.ClearWidth < CityDesign.StairClearWidth
+                || flight.LandingBeforeDepth < CityDesign.StairTurnLandingDepth
+                || flight.LandingAfterDepth < CityDesign.StairTurnLandingDepth)
             {
-                worst = tier;
+                return RouteTier.Unreachable;
             }
+
+            if (i == 0)
+            {
+                if (!Approximately(flight.Start.y, ascent.BaseY))
+                {
+                    return RouteTier.Unreachable;
+                }
+            }
+            else
+            {
+                StairFlightPlan previous = ascent.Flights[i - 1];
+
+                if (!Approximately(flight.Start.y, previous.End.y)
+                    || !SameRect(flight.LandingBefore, previous.LandingAfter))
+                {
+                    return RouteTier.Unreachable;
+                }
+            }
+
+            steps += flight.StepCount;
+            rise += flight.Rise;
         }
 
-        return worst;
+        StairFlightPlan last = ascent.Flights[ascent.Flights.Count - 1];
+        return steps == ascent.StepCount
+               && Approximately(rise, ascent.Rise)
+               && Approximately(last.End.y, ascent.TopY)
+               && Approximately(ascent.FinalLandingY, ascent.TopY)
+               && SameRect(last.LandingAfter, ascent.FinalLanding)
+            ? RouteTier.Green
+            : RouteTier.Unreachable;
     }
+
+    private static bool Approximately(float a, float b) => Mathf.Abs(a - b) <= 0.0001f;
+
+    private static bool SameRect(in CityRect a, in CityRect b)
+        => Approximately(a.MinX, b.MinX)
+           && Approximately(a.MaxX, b.MaxX)
+           && Approximately(a.MinZ, b.MinZ)
+           && Approximately(a.MaxZ, b.MaxZ);
 
     private void Add(string node)
     {

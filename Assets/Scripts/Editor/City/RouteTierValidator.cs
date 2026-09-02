@@ -21,10 +21,10 @@ using UnityEngine;
 /// roof cluster rule that decides which roofs are linkable at all.
 ///
 /// Phase 6C added the layer that has authored jumps in it, and with it the two questions that are
-/// that phase's exit criterion: does every step of every fire escape, riser, link stair and bridge
-/// measure at the tier it was declared at, and is every relay reachable from at least three
-/// separate ways in off the street. Both are answered by measuring, not by asserting - which is
-/// why a report with a single FAIL in it means Phase 6C is not done.
+/// that phase's exit criterion: does every jump and every stair or ramp satisfy its declared
+/// traversal envelope, and is every relay reachable from at least three separate ways in off the
+/// street. Both are answered by measuring, not by asserting - which is why a report with a single
+/// FAIL in it means Phase 6C is not done.
 /// </summary>
 public static class RouteTierValidator
 {
@@ -415,89 +415,176 @@ public static class RouteTierValidator
     }
 
     /// <summary>
-    /// Every step of every stack, measured.
-    ///
-    /// The rule is not "these look climbable": an ascent step is one mantle, a mantle is ORANGE,
-    /// and so no step anywhere in the city may measure harder than ORANGE. A step that grades RED
-    /// is a stack whose ledges have drifted apart, and one that grades Unreachable is a ladder with
-    /// a rung missing - which is exactly what happened to the Old Quarter's risers the first time
-    /// they were authored on the wrong facade.
+    /// Every explicit flight of every normal stair, measured. A stair is traversable only when its
+    /// risers, treads, clear width, landings, and joins all satisfy the authored walking envelope.
     /// </summary>
     private static int CheckAscents(StringBuilder sb, CityPlanResult plan)
     {
         int fail = 0;
         int steps = 0;
-        System.Collections.Generic.Dictionary<RouteTier, int> histogram =
-            new System.Collections.Generic.Dictionary<RouteTier, int>();
+        int flights = 0;
 
         sb.AppendLine("ASCENTS (fire escapes, scaffolds, risers, link stairs)");
-        sb.AppendLine("  ascent                              kind          from      to  steps  " +
-                      "rise/step  worst");
+        sb.AppendLine("  ascent                              kind          from      to flights " +
+                      "steps  riser  status");
 
         foreach (AscentPlan ascent in plan.Traversal.Ascents)
         {
-            if (ascent.IsRamped)
+            if (ascent.Kind == AscentKind.TowerSpiral)
             {
                 continue;
             }
 
             int problems = 0;
-            int index = 0;
+            int plannedSteps = 0;
+            float plannedRise = 0f;
 
-            foreach (AscentStep step in ascent.Steps())
-            {
-                RouteTier tier = step.Tier;
-                histogram.TryGetValue(tier, out int count);
-                histogram[tier] = count + 1;
-                steps++;
-
-                if (tier > RouteTier.Orange)
-                {
-                    problems++;
-                    sb.AppendLine($"  *** {ascent.Name} step {index}: gap {step.Gap:F2} m, rise " +
-                                  $"{step.Rise:F2} m, landing {step.LandingDepth:F2} m grades " +
-                                  $"{tier} - a mantle is ORANGE");
-                }
-
-                index++;
-            }
-
-            if (ascent.StepRise > CityDesign.AscentStepRise + 0.001f)
+            if (ascent.Style != AscentTraversalStyle.WalkableStair)
             {
                 problems++;
-                sb.AppendLine($"  *** {ascent.Name}: {ascent.StepRise:F2} m per step is past the " +
-                              $"{CityDesign.AscentStepRise:F2} m mantle step");
+                sb.AppendLine($"  *** {ascent.Name}: normal ascents must use explicit " +
+                              "WalkableStair flights");
+            }
+
+            if (ascent.Flights.Count == 0)
+            {
+                problems++;
+                sb.AppendLine($"  *** {ascent.Name}: no explicit stair flights were planned");
+            }
+
+            for (int i = 0; i < ascent.Flights.Count; i++)
+            {
+                StairFlightPlan flight = ascent.Flights[i];
+                flights++;
+                steps += flight.StepCount;
+                plannedSteps += flight.StepCount;
+                plannedRise += flight.Rise;
+
+                problems += StairRule(sb, ascent.Name, i, "step count", flight.StepCount,
+                    flight.StepCount > 0, "must be positive");
+                problems += StairRule(sb, ascent.Name, i, "riser", flight.RiserHeight,
+                    flight.RiserHeight > 0f
+                    && flight.RiserHeight <= CityDesign.StairMaximumRiserHeight,
+                    $"must be > 0 and <= {CityDesign.StairMaximumRiserHeight:F2} m");
+                problems += StairRule(sb, ascent.Name, i, "tread", flight.TreadDepth,
+                    flight.TreadDepth >= CityDesign.StairPreferredTreadDepth,
+                    $"must be >= {CityDesign.StairPreferredTreadDepth:F2} m");
+                problems += StairRule(sb, ascent.Name, i, "clear width", flight.ClearWidth,
+                    flight.ClearWidth >= CityDesign.StairClearWidth,
+                    $"must be >= {CityDesign.StairClearWidth:F2} m");
+                problems += StairRule(sb, ascent.Name, i, "landing before",
+                    flight.LandingBeforeDepth,
+                    flight.LandingBeforeDepth >= CityDesign.StairTurnLandingDepth,
+                    $"must be >= {CityDesign.StairTurnLandingDepth:F2} m");
+                problems += StairRule(sb, ascent.Name, i, "landing after",
+                    flight.LandingAfterDepth,
+                    flight.LandingAfterDepth >= CityDesign.StairTurnLandingDepth,
+                    $"must be >= {CityDesign.StairTurnLandingDepth:F2} m");
+
+                if (i == 0)
+                {
+                    problems += StairRule(sb, ascent.Name, i, "start elevation", flight.Start.y,
+                        Near(flight.Start.y, ascent.BaseY),
+                        $"must equal ascent base {ascent.BaseY:F2} m");
+                }
+                else
+                {
+                    StairFlightPlan previous = ascent.Flights[i - 1];
+                    problems += StairRule(sb, ascent.Name, i, "join elevation", flight.Start.y,
+                        Near(flight.Start.y, previous.End.y),
+                        $"must equal prior flight end {previous.End.y:F2} m");
+
+                    if (!SameRect(flight.LandingBefore, previous.LandingAfter))
+                    {
+                        problems++;
+                        sb.AppendLine($"  *** {ascent.Name} flight {i}: landing before does not " +
+                                      "match the preceding flight's landing after");
+                    }
+                }
+            }
+
+            if (plannedSteps != ascent.StepCount)
+            {
+                problems++;
+                sb.AppendLine($"  *** {ascent.Name}: flights contain {plannedSteps} steps but " +
+                              $"the ascent declares {ascent.StepCount}");
+            }
+
+            if (ascent.StepRise <= 0f
+                || ascent.StepRise > CityDesign.StairMaximumRiserHeight)
+            {
+                problems++;
+                sb.AppendLine($"  *** {ascent.Name}: declared riser {ascent.StepRise:F5} m must " +
+                              $"be > 0 and <= {CityDesign.StairMaximumRiserHeight:F2} m");
+            }
+
+            if (!Near(plannedRise, ascent.Rise))
+            {
+                problems++;
+                sb.AppendLine($"  *** {ascent.Name}: flight rise totals {plannedRise:F2} m but " +
+                              $"the ascent rises {ascent.Rise:F2} m");
+            }
+
+            if (ascent.Flights.Count > 0)
+            {
+                StairFlightPlan last = ascent.Flights[ascent.Flights.Count - 1];
+
+                if (!Near(last.End.y, ascent.TopY)
+                    || !Near(ascent.FinalLandingY, ascent.TopY)
+                    || !SameRect(last.LandingAfter, ascent.FinalLanding))
+                {
+                    problems++;
+                    sb.AppendLine($"  *** {ascent.Name}: final flight and landing do not reach " +
+                                  $"the declared top at {ascent.TopY:F2} m");
+                }
+            }
+
+            if (problems == 0 && RoofGraph.WorstStep(ascent) != RouteTier.Green)
+            {
+                problems++;
+                sb.AppendLine($"  *** {ascent.Name}: explicit stair geometry is not continuous");
             }
 
             fail += problems;
             sb.AppendLine($"  {ascent.Name,-35} {ascent.Kind,-12} {ascent.BaseY,7:F2} " +
-                          $"{ascent.TopY,7:F2} {ascent.StepCount,6} {ascent.StepRise,10:F2}  " +
-                          $"{RoofGraph.WorstStep(ascent),-8}" +
+                          $"{ascent.TopY,7:F2} {ascent.Flights.Count,7} " +
+                          $"{ascent.StepCount,5} {ascent.StepRise,6:F2}  " +
+                          $"{RoofGraph.WorstStep(ascent),-11}" +
                           (problems == 0 ? string.Empty : "*** see above"));
         }
 
         sb.AppendLine();
-        sb.AppendLine($"  steps measured           {steps,7}");
-
-        foreach (RouteTier tier in new[]
-                 {
-                     RouteTier.Green, RouteTier.Blue, RouteTier.Orange, RouteTier.Red,
-                     RouteTier.Unreachable
-                 })
-        {
-            histogram.TryGetValue(tier, out int count);
-            sb.AppendLine($"  {tier,-24} {count,7}");
-        }
-
+        sb.AppendLine($"  stair flights measured   {flights,7}");
+        sb.AppendLine($"  visible steps measured   {steps,7}");
         sb.AppendLine();
         return fail;
     }
 
+    private static int StairRule(StringBuilder sb, string ascent, int flight, string dimension,
+        float value, bool ok, string requirement)
+    {
+        if (ok)
+        {
+            return 0;
+        }
+
+        sb.AppendLine($"  *** {ascent} flight {flight}: {dimension} {value:F5} {requirement}");
+        return 1;
+    }
+
+    private static bool Near(float a, float b) => Mathf.Abs(a - b) <= 0.0001f;
+
+    private static bool SameRect(in CityRect a, in CityRect b)
+        => Near(a.MinX, b.MinX)
+           && Near(a.MaxX, b.MaxX)
+           && Near(a.MinZ, b.MinZ)
+           && Near(a.MaxZ, b.MaxZ);
+
     /// <summary>
-    /// The one ascent that is walked rather than mantled. It is graded on its pitch, and on the two
-    /// joints at the top: the spiral's corner landings sit diagonally off the shaft's corner and
-    /// meet its roof at a single point, so the summit slab that fills that corner has to exist and
-    /// has to share a real edge with both.
+    /// The sole ramped ascent. It is graded on its style and pitch, and on the two joints at the
+    /// top: the spiral's corner landings sit diagonally off the shaft's corner and meet its roof at
+    /// a single point, so the summit slab that fills that corner has to exist and has to share a
+    /// real edge with both.
     /// </summary>
     private static int CheckTowerSpiral(StringBuilder sb, CityPlanResult plan)
     {
@@ -524,6 +611,8 @@ public static class RouteTierValidator
         float toShaft = spiral.SummitFootprint.SharedEdgeWith(spiral.TopFootprint);
 
         int fail = 0;
+        fail += Rule(sb, "ramp style", (float)spiral.Style,
+            spiral.Style == AscentTraversalStyle.Ramp);
         fail += Rule(sb, "runs", spiral.StepCount, spiral.StepCount > 0);
         fail += Rule(sb, "rise per run     m", spiral.StepRise, true);
         fail += Rule(sb, "pitch          deg", spiral.PitchDegrees,
