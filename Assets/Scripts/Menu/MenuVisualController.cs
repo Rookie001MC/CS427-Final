@@ -18,12 +18,22 @@ public sealed class MenuVisualController : MonoBehaviour
         MainRun,
 
         /// <summary>The practice courses, grouped and labelled as such.</summary>
-        Training
+        Training,
+
+        /// <summary>
+        /// The runner profile: the whole persisted career on one screen.
+        ///
+        /// A panel of this menu rather than a scene of its own, for the same reason level select
+        /// is: it loads nothing, it plays nothing, and a scene load to show a table of numbers
+        /// would cost a black frame and a second EventSystem to keep in step.
+        /// </summary>
+        Stats
     }
 
     [SerializeField] private UIPanel mainPanel;
     [SerializeField] private UIPanel mainRunPanel;
     [SerializeField] private UIPanel trainingPanel;
+    [SerializeField] private UIPanel statsPanel;
 
     public Screen Current { get; private set; } = Screen.Main;
 
@@ -36,6 +46,7 @@ public sealed class MenuVisualController : MonoBehaviour
         Apply(mainPanel, false, true);
         Apply(mainRunPanel, false, true);
         Apply(trainingPanel, false, true);
+        Apply(statsPanel, false, true);
     }
 
     public void Show(Screen screen, bool immediate = false)
@@ -45,6 +56,7 @@ public sealed class MenuVisualController : MonoBehaviour
         Apply(mainPanel, screen == Screen.Main, immediate);
         Apply(mainRunPanel, screen == Screen.MainRun, immediate);
         Apply(trainingPanel, screen == Screen.Training, immediate);
+        Apply(statsPanel, screen == Screen.Stats, immediate);
 
         ScreenChanged?.Invoke(screen);
     }

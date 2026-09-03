@@ -61,12 +61,14 @@ public static class MainMenuBuilder
         MainRefs main = BuildMainPanel(root, mainRun, out UIPanel mainPanel);
         HeroRefs hero = BuildMainRunPanel(root, mainRun, out UIPanel heroPanel);
         SelectRefs select = BuildTrainingPanel(root, trainingCount, out UIPanel trainingPanel);
+        StatsRefs stats = BuildStatsPanel(root, levels, out UIPanel statsPanel);
         ModeSelectionView modeSelection = BuildModeSelectionModal(root);
         SceneLoader loader = BuildLoadingOverlay();
 
         SetRef(visuals, "mainPanel", mainPanel);
         SetRef(visuals, "mainRunPanel", heroPanel);
         SetRef(visuals, "trainingPanel", trainingPanel);
+        SetRef(visuals, "statsPanel", statsPanel);
 
         SetRef(controller, "visuals", visuals);
         SetRef(controller, "loader", loader);
@@ -80,6 +82,8 @@ public static class MainMenuBuilder
         SetRef(controller, "mainRunBackButton", hero.Back);
         SetRef(controller, "backButton", select.Back);
         SetRef(controller, "clearedValue", select.Cleared);
+        SetRef(controller, "stats", stats.View);
+        SetRef(controller, "statsBackButton", stats.Back);
         SetList(controller, "levels", levels.ConvertAll(l => (Object)l));
         SetList(controller, "cards", select.Cards.ConvertAll(c => (Object)c));
 
@@ -851,6 +855,493 @@ public static class MainMenuBuilder
         return new ModeChoiceRefs { Button = button, Best = best };
     }
 
+    // ------------------------------------------------------------------ player stats
+
+    private struct StatsRefs
+    {
+        public PlayerStatsView View;
+        public Button Back;
+    }
+
+    /// <summary>
+    /// The runner profile: the whole persisted career on one screen.
+    ///
+    /// Laid out from Player_Stats.png - three equal columns on a 36-unit gutter, a brand mark and
+    /// an eyebrow over a two-tone display title, one cyan hairline under the header, dark bordered
+    /// panels, and a left column of stat plates over the action breakdown. Two things about that
+    /// reference are deliberately not copied.
+    ///
+    /// The first is its type sizes. The mockup is a 2005 x 1186 browser screenshot read at desk
+    /// distance; its panel headings measure about 16pt of mono in canvas units, which renders a
+    /// 7.6-pixel cap at 1280x720 and fails the floor <see cref="UITypographyAudit"/> enforces. So
+    /// the reference sets the structure and <see cref="UITheme"/> sets the sizes, exactly as the
+    /// rest of this menu already does. The consequence is that the same information needs more
+    /// room, which is why the action breakdown sits under Recent Runs - in the half of the centre
+    /// column the reference leaves empty - rather than beneath the stat plates.
+    ///
+    /// The second is its content. Every VERTEX mark is SKYBOUND TRIALS, the invented runner class
+    /// and combo score are gone, the leaderboard ranks are gone because the game has no
+    /// leaderboard, and the achievements column is replaced by the main run's real record - the
+    /// project has no achievement system and inventing one to fill a panel would be worse than an
+    /// honest one.
+    /// </summary>
+    private static StatsRefs BuildStatsPanel(RectTransform root, List<LevelEntry> levels,
+        out UIPanel panel)
+    {
+        // ---- the grid the whole screen is measured from
+        const float margin = 64f;
+        const float columnW = 573f;
+        const float gutter = 36f;
+        const float leftX = margin;
+        const float centreX = margin + columnW + gutter;          // 673
+        const float rightX = centreX + columnW + gutter;          // 1282
+        const float contentTop = 326f;
+
+        RectTransform layer = Layer(root, "StatsPanel", out panel);
+
+        Image bg = Img(layer, "Background", new Color(0.024f, 0.028f, 0.035f, 1f));
+        Stretch((RectTransform)bg.transform);
+
+        StatsRefs refs = new StatsRefs();
+
+        // ---- header --------------------------------------------------------------
+        // The reference's top bar is a mockup navigator for a page of screens, not a game
+        // control, so it is not recreated: the brand stays where it was, and the one thing the
+        // player actually needs up there - the way back - takes the right-hand end of the row.
+        Image tick = Img(layer, "BrandTick", UITheme.CyanBright);
+        TopLeft((RectTransform)tick.transform, margin, 44f, 6f, 30f);
+
+        TopLeft(Text(layer, "Brand", "SKYBOUND TRIALS", UITheme.ButtonLabel, UITheme.White,
+                TextAlignmentOptions.TopLeft, 8f, FontStyles.Bold, UIFontRole.Display),
+            84f, 38f, 480f, 48f);
+
+        TopLeft(Text(layer, "Eyebrow", "RUNNER PROFILE", UITheme.StatLabel, UITheme.Cyan,
+                TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
+            margin, 100f, 700f, 35f);
+
+        // One text object, not two: a display headline split across two objects has to be placed
+        // by hand from an advance-width estimate, and the word gap is then wrong the moment the
+        // face changes. Rich text lets TMP set the line and colour the second word.
+        // The box is the full content width rather than the line's measured width: the colour tag
+        // is markup, and a preferred-width measurement that counted it as ink would read as a
+        // clipped headline in the typography audit.
+        string statsInCyan = $"PLAYER <color=#{ColorUtility.ToHtmlStringRGB(UITheme.CyanBright)}>" +
+                             "STATS</color>";
+        TopLeft(Text(layer, "Title", statsInCyan, UITheme.TitleMedium, UITheme.White,
+                TextAlignmentOptions.TopLeft, UITheme.DisplaySpacing, FontStyles.Bold,
+                UIFontRole.Display),
+            60f, 132f, 1792f, 146f);
+
+        Image rule = Img(layer, "Rule",
+            new Color(UITheme.Cyan.r, UITheme.Cyan.g, UITheme.Cyan.b, 0.35f));
+        TopLeft((RectTransform)rule.transform, margin, 298f, 1792f, 1f);
+
+        refs.Back = SmallButton(layer, "StatsBackButton", "BACK", Vector2.zero,
+            new Vector2(200f, 56f));
+        Anchor((RectTransform)refs.Back.transform, new Vector2(1f, 1f), new Vector2(-margin, -34f),
+            new Vector2(200f, 56f));
+
+        // ---- left column: identity, career plates, career footer -----------------
+        RectTransform identity = StatsCard(layer, "IdentityCard", leftX, contentTop, columnW, 140f);
+
+        // The reference brands this card VERTEX and gives the player an invented "Runner Class".
+        // There are no accounts in this game, so the emblem is the game's own initials and the
+        // card says what the screen is instead of inventing a rank to fill the line.
+        Image emblem = Img(identity, "Emblem", UITheme.CyanBright);
+        TopLeft((RectTransform)emblem.transform, 24f, 28f, 84f, 84f);
+
+        TMP_Text emblemMark = Text((RectTransform)emblem.transform, "Mark", "ST", UITheme.StatValue,
+            new Color32(8, 10, 12, 255), TextAlignmentOptions.Center, 4f, FontStyles.Bold,
+            UIFontRole.Display);
+        Stretch((RectTransform)emblemMark.transform);
+
+        TopLeft(Text(identity, "Name", "SKYBOUND TRIALS", UITheme.ButtonLabel, UITheme.White,
+                TextAlignmentOptions.TopLeft, 4f, FontStyles.Bold, UIFontRole.Display),
+            128f, 32f, 400f, 48f);
+
+        TopLeft(Text(identity, "Role", "RUNNER PROFILE", UITheme.LabelSmall, UITheme.Label,
+                TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+            128f, 84f, 400f, 32f);
+
+        // Six plates on the reference's two-column grid, one row deeper: the four it shows plus
+        // the two career figures a parkour career actually turns on.
+        const float plateW = 278f;
+        const float plateH = 134f;
+        const float plateGutterX = 17f;
+        const float plateGutterY = 14f;
+        const float platesTop = contentTop + 140f + 16f;           // 482
+
+        TMP_Text totalRuns = StatPlate(layer, "TotalRunsCard", "TOTAL RUNS", "00", string.Empty,
+            leftX, platesTop, plateW, plateH);
+        TMP_Text completedRuns = StatPlate(layer, "CompletedRunsCard", "COMPLETED RUNS", "00",
+            string.Empty, leftX + plateW + plateGutterX, platesTop, plateW, plateH);
+
+        const float platesRow2 = platesTop + plateH + plateGutterY;
+        TMP_Text maxSpeed = StatPlate(layer, "MaxSpeedCard", "MAX SPEED", "0.0", "M/S",
+            leftX, platesRow2, plateW, plateH);
+        TMP_Text distance = StatPlate(layer, "DistanceCard", "DISTANCE", "0.0", "KM",
+            leftX + plateW + plateGutterX, platesRow2, plateW, plateH);
+
+        const float platesRow3 = platesRow2 + plateH + plateGutterY;
+        TMP_Text deaths = StatPlate(layer, "DeathsCard", "DEATHS", "00", string.Empty,
+            leftX, platesRow3, plateW, plateH);
+        TMP_Text runTime = StatPlate(layer, "RunTimeCard", "RUN TIME", "00H 00M", string.Empty,
+            leftX + plateW + plateGutterX, platesRow3, plateW, plateH);
+
+        RectTransform footer = StatsCard(layer, "CareerFooter", leftX, 924f, columnW, 108f);
+        TMP_Text failedRuns = MiniStat(footer, "Failed", "FAILED RUNS", 24f);
+        TMP_Text checkpointsHit = MiniStat(footer, "Checkpoints", "CHECKPOINTS", 296f);
+
+        // ---- centre column: recent runs, then the action breakdown ---------------
+        RectTransform recent = StatsPanelBox(layer, "RecentRunsPanel", centreX, contentTop,
+            columnW, 471f, "RECENT RUNS", string.Empty, out _);
+
+        List<RecentRunRowView> rows = new List<RecentRunRowView>();
+        for (int i = 0; i < 4; i++)
+        {
+            rows.Add(RecentRunRow(recent, i, 69f + i * 98f));
+        }
+
+        TMP_Text noRuns = Text(recent, "EmptyMessage", PlayerStatsFormat.NoRuns, UITheme.StatLabel,
+            UITheme.Dim, TextAlignmentOptions.Center, UITheme.EyebrowSpacing,
+            fontRole: UIFontRole.Mono);
+        TopLeft(noRuns, 24f, 200f, 525f, 40f);
+
+        RectTransform breakdown = StatsPanelBox(layer, "ParkourBreakdownPanel", centreX, 821f,
+            columnW, 207f, "PARKOUR BREAKDOWN", "ACTION COUNTS", out _);
+
+        List<TMP_Text> actionValues = new List<TMP_Text>();
+        List<RectTransform> actionBars = new List<RectTransform>();
+
+        for (int i = 0; i < PlayerStatsFormat.Actions.Length; i++)
+        {
+            ParkourAction action = PlayerStatsFormat.Actions[i];
+            float cellX = i < 3 ? 20f : 297f;
+            float cellY = 61f + (i % 3) * 44f;
+
+            actionValues.Add(ActionBarRow(breakdown, action, cellX, cellY, 256f,
+                out RectTransform fill));
+            actionBars.Add(fill);
+        }
+
+        // ---- right column: the main run's record, then the training records ------
+        LevelEntry mainRun = levels.Find(l => l != null && l.IsMainRun);
+
+        // Not "MainRunPanel": the menu already has a screen by that name, and two objects with
+        // one path is how a find-by-path test starts passing for the wrong reason.
+        RectTransform main = StatsPanelBox(layer, "MainRunRecordPanel", rightX, contentTop, columnW,
+            450f, "MAIN RUN", mainRun != null ? mainRun.DisplayName : "NO MAIN RUN",
+            out TMP_Text mainRunName);
+
+        TMP_Text attempts = RecordRow(main, "Attempts", "ATTEMPTS", "00", 69f, true);
+        TMP_Text completions = RecordRow(main, "Completions", "COMPLETIONS", "00", 127f, true);
+        TMP_Text bestTime = RecordRow(main, "BestTime", "BEST TIME", PlayerStatsFormat.NoTime,
+            185f, true);
+        TMP_Text checkpointBest = RecordRow(main, "CheckpointBest", "CHECKPOINT BEST",
+            PlayerStatsFormat.NoTime, 243f, true);
+        TMP_Text noCheckpointBest = RecordRow(main, "NoCheckpointBest", "NO-CHECKPOINT BEST",
+            PlayerStatsFormat.NoTime, 301f, true);
+        TMP_Text checkpointsReached = RecordRow(main, "CheckpointsReached", "CHECKPOINTS REACHED",
+            "00", 359f, false);
+
+        RectTransform training = StatsPanelBox(layer, "TrainingRecordsPanel", rightX, 800f,
+            columnW, 232f, "TRAINING RECORDS", string.Empty, out _);
+
+        List<TMP_Text> trainingNames = new List<TMP_Text>();
+        List<TMP_Text> trainingTimes = new List<TMP_Text>();
+
+        for (int i = 0; i < 2; i++)
+        {
+            trainingNames.Add(TrainingRow(training, i, 69f + i * 78f, i == 0,
+                out TMP_Text time));
+            trainingTimes.Add(time);
+        }
+
+        // ---- wiring --------------------------------------------------------------
+        PlayerStatsView view = layer.gameObject.AddComponent<PlayerStatsView>();
+        SetList(view, "levels", levels.ConvertAll(l => (Object)l));
+
+        SetRef(view, "totalRunsValue", totalRuns);
+        SetRef(view, "completedRunsValue", completedRuns);
+        SetRef(view, "maxSpeedValue", maxSpeed);
+        SetRef(view, "distanceValue", distance);
+        SetRef(view, "deathsValue", deaths);
+        SetRef(view, "runTimeValue", runTime);
+        SetRef(view, "failedRunsValue", failedRuns);
+        SetRef(view, "checkpointsValue", checkpointsHit);
+
+        SetList(view, "actionValues", actionValues.ConvertAll(t => (Object)t));
+        SetList(view, "actionBars", actionBars.ConvertAll(t => (Object)t));
+
+        SetList(view, "recentRows", rows.ConvertAll(r => (Object)r));
+        SetRef(view, "recentEmptyMessage", noRuns);
+
+        SetRef(view, "mainRunName", mainRunName);
+        SetRef(view, "mainRunAttempts", attempts);
+        SetRef(view, "mainRunCompletions", completions);
+        SetRef(view, "mainRunBestTime", bestTime);
+        SetRef(view, "mainRunCheckpointBest", checkpointBest);
+        SetRef(view, "mainRunNoCheckpointBest", noCheckpointBest);
+        SetRef(view, "mainRunCheckpoints", checkpointsReached);
+
+        SetList(view, "trainingNames", trainingNames.ConvertAll(t => (Object)t));
+        SetList(view, "trainingTimes", trainingTimes.ConvertAll(t => (Object)t));
+
+        refs.View = view;
+
+        // The builder deliberately does not bind the screen to the live save.
+        //
+        // A generated scene has to be a function of the project, not of whoever last ran the
+        // game: baking the machine's own career into MainMenu.unity would make two rebuilds
+        // produce two different scenes and put one developer's numbers in another's diff. What is
+        // committed is therefore the state a new player is supposed to see - zeroes, dashes and
+        // NO RUNS RECORDED - and PlayerStatsView fills in the real career when the screen opens.
+        return refs;
+    }
+
+    /// <summary>A bordered dark card. The screen's only container primitive.</summary>
+    private static RectTransform StatsCard(RectTransform parent, string name, float x, float y,
+        float w, float h)
+    {
+        RectTransform rt = Block(parent, name, new Vector2(0f, 1f), new Vector2(x, -y),
+            new Vector2(w, h));
+
+        Image border = Img(rt, "Border", UITheme.PanelBorder);
+        Stretch((RectTransform)border.transform);
+
+        Image fill = Img(rt, "Fill", UITheme.PanelFillSoft);
+        RectTransform fillRt = (RectTransform)fill.transform;
+        Stretch(fillRt);
+        fillRt.offsetMin = Vector2.one;
+        fillRt.offsetMax = -Vector2.one;
+
+        return rt;
+    }
+
+    /// <summary>
+    /// A bordered panel with a heading and an optional right-aligned caption, as every panel in
+    /// the reference carries. Returns the content rect; the caption comes back for binding.
+    /// </summary>
+    private static RectTransform StatsPanelBox(RectTransform parent, string name, float x, float y,
+        float w, float h, string heading, string caption, out TMP_Text captionText)
+    {
+        RectTransform rt = Block(parent, name, new Vector2(0f, 1f), new Vector2(x, -y),
+            new Vector2(w, h));
+
+        Image border = Img(rt, "Border", UITheme.PanelBorder);
+        Stretch((RectTransform)border.transform);
+
+        Image fill = Img(rt, "Fill", UITheme.PanelFill);
+        RectTransform fillRt = (RectTransform)fill.transform;
+        Stretch(fillRt);
+        fillRt.offsetMin = Vector2.one;
+        fillRt.offsetMax = -Vector2.one;
+
+        TopLeft(Text(rt, "Heading", heading, UITheme.StatLabel, UITheme.Cyan,
+                TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+            22f, 18f, 300f, 35f);
+
+        // The caption carries a level name, so it gets the width a longer one would need rather
+        // than the width the current catalogue happens to want.
+        captionText = Text(rt, "Caption", caption, UITheme.LabelSmall, UITheme.Dim,
+            TextAlignmentOptions.Right, 4f, fontRole: UIFontRole.Mono);
+        TopLeft(captionText, 332f, 20f, w - 332f - 22f, 32f);
+
+        return rt;
+    }
+
+    /// <summary>
+    /// One of the reference's stat plates: a small-caps label over a display figure, with the
+    /// unit set beside it rather than inside it so the number stays the plate's subject.
+    /// </summary>
+    private static TMP_Text StatPlate(RectTransform parent, string name, string label,
+        string value, string unit, float x, float y, float w, float h)
+    {
+        RectTransform rt = StatsCard(parent, name, x, y, w, h);
+
+        TopLeft(Text(rt, "Label", label, UITheme.LabelSmall, UITheme.Label,
+                TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+            20f, 18f, 238f, 32f);
+
+        TMP_Text figure = Text(rt, "Value", value, UITheme.StatValue, UITheme.White,
+            TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(figure, 20f, 56f, 170f, 63f);
+
+        // A career count can reach five figures; the plate does not grow, so the figure is the one
+        // thing on this screen allowed to set itself smaller rather than run over its own unit.
+        AutoSize(figure, UITheme.CardTitle * 0.8f, UITheme.StatValue);
+
+        if (!string.IsNullOrEmpty(unit))
+        {
+            TopLeft(Text(rt, "Unit", unit, UITheme.LabelSmall, UITheme.Label,
+                    TextAlignmentOptions.Left, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+                196f, 76f, 60f, 32f);
+        }
+
+        return figure;
+    }
+
+    /// <summary>A label-over-figure pair inside the career footer card.</summary>
+    private static TMP_Text MiniStat(RectTransform parent, string name, string label, float x)
+    {
+        TopLeft(Text(parent, name + "Label", label, UITheme.LabelSmall, UITheme.Label,
+                TextAlignmentOptions.TopLeft, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+            x, 16f, 250f, 32f);
+
+        TMP_Text value = Text(parent, name + "Value", "00", UITheme.ButtonLabel, UITheme.White,
+            TextAlignmentOptions.TopLeft, 0f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(value, x, 54f, 250f, 48f);
+        AutoSize(value, UITheme.MinimumSize, UITheme.ButtonLabel);
+
+        return value;
+    }
+
+    /// <summary>
+    /// One Recent Runs row: a track-coloured accent, the level, its ruleset and date, the time it
+    /// took and what became of it. The reference's leaderboard rank is not here - the game has no
+    /// leaderboard, so a "#4" would be a number about nothing.
+    /// </summary>
+    private static RecentRunRowView RecentRunRow(RectTransform parent, int index, float y)
+    {
+        const float rowW = 533f;
+        const float rowH = 90f;
+
+        RectTransform rt = Block(parent, $"RecentRun_{index + 1:00}", new Vector2(0f, 1f),
+            new Vector2(20f, -y), new Vector2(rowW, rowH));
+
+        Image fill = Img(rt, "Fill", UITheme.PanelFillSoft);
+        Stretch((RectTransform)fill.transform);
+
+        Image accent = Img(rt, "Accent", UITheme.CyanBright);
+        Anchor((RectTransform)accent.transform, new Vector2(0f, 0.5f), Vector2.zero,
+            new Vector2(4f, rowH));
+
+        TMP_Text title = Text(rt, "Title", string.Empty, UITheme.ButtonLabel, UITheme.White,
+            TextAlignmentOptions.TopLeft, 1f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(title, 20f, 6f, 250f, 48f);
+        AutoSize(title, UITheme.MinimumSize, UITheme.ButtonLabel);
+
+        TMP_Text track = Text(rt, "Track", string.Empty, UITheme.LabelSmall, UITheme.Orange,
+            TextAlignmentOptions.Right, 4f, fontRole: UIFontRole.Mono);
+        TopLeft(track, 272f, 12f, 128f, 32f);
+
+        TMP_Text time = Text(rt, "Time", string.Empty, UITheme.ButtonLabel, UITheme.White,
+            TextAlignmentOptions.Right, 0f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(time, 406f, 6f, 127f, 48f);
+
+        TMP_Text meta = Text(rt, "Meta", string.Empty, UITheme.LabelSmall, UITheme.Label,
+            TextAlignmentOptions.TopLeft, 2f, fontRole: UIFontRole.Mono);
+        TopLeft(meta, 20f, 56f, 290f, 32f);
+
+        TMP_Text status = Text(rt, "Status", string.Empty, UITheme.LabelSmall, UITheme.Cyan,
+            TextAlignmentOptions.Right, 2f, FontStyles.Bold, UIFontRole.Mono);
+        TopLeft(status, 320f, 56f, 213f, 32f);
+
+        RecentRunRowView row = rt.gameObject.AddComponent<RecentRunRowView>();
+        SetRef(row, "accent", accent);
+        SetRef(row, "fill", fill);
+        SetRef(row, "title", title);
+        SetRef(row, "trackLabel", track);
+        SetRef(row, "meta", meta);
+        SetRef(row, "time", time);
+        SetRef(row, "status", status);
+
+        return row;
+    }
+
+    /// <summary>
+    /// One action's row in the breakdown: name, count, and a bar measured against the player's
+    /// own highest count.
+    ///
+    /// The reference draws these as skill scores out of a hundred. Nothing in this game produces
+    /// such a score, so the number is the raw count - the panel's caption says so - and the bar is
+    /// explicitly relative. A bar that implied a 0-100 rating would be the one invented statistic
+    /// on the screen.
+    /// </summary>
+    private static TMP_Text ActionBarRow(RectTransform parent, ParkourAction action, float x,
+        float y, float w, out RectTransform barFill)
+    {
+        RectTransform rt = Block(parent, $"Action_{action}", new Vector2(0f, 1f),
+            new Vector2(x, -y), new Vector2(w, 42f));
+
+        TopLeft(Text(rt, "Label", PlayerStatsFormat.Label(action), UITheme.LabelSmall,
+                UITheme.Label, TextAlignmentOptions.Left, UITheme.LabelSpacing,
+                fontRole: UIFontRole.Mono),
+            0f, 0f, 170f, 32f);
+
+        // Not bolded: Roboto Mono Medium is already a 500 weight, and TMP's faux bold adds
+        // 0.07em of advance per glyph - enough to push a five-figure count out of its box.
+        TMP_Text value = Text(rt, "Value", "0", UITheme.StatLabel, UITheme.Cyan,
+            TextAlignmentOptions.Right, 0f, fontRole: UIFontRole.Mono);
+        TopLeft(value, 180f, 0f, 76f, 33f);
+
+        Image track = Img(rt, "BarTrack", new Color(1f, 1f, 1f, 0.10f));
+        TopLeft((RectTransform)track.transform, 0f, 36f, w, 5f);
+
+        Image fill = Img((RectTransform)track.transform, "BarFill", UITheme.CyanBright);
+        barFill = (RectTransform)fill.transform;
+        barFill.anchorMin = Vector2.zero;
+        barFill.anchorMax = new Vector2(0f, 1f);
+        barFill.pivot = new Vector2(0f, 0.5f);
+        barFill.offsetMin = Vector2.zero;
+        barFill.offsetMax = Vector2.zero;
+
+        return value;
+    }
+
+    /// <summary>A label / value line inside the main run's record panel.</summary>
+    private static TMP_Text RecordRow(RectTransform parent, string name, string label,
+        string value, float y, bool divider)
+    {
+        RectTransform rt = Block(parent, name + "Row", new Vector2(0f, 1f),
+            new Vector2(24f, -y), new Vector2(525f, 52f));
+
+        TopLeft(Text(rt, "Label", label, UITheme.LabelSmall, UITheme.Label,
+                TextAlignmentOptions.Left, UITheme.LabelSpacing, fontRole: UIFontRole.Mono),
+            0f, 10f, 330f, 32f);
+
+        TMP_Text figure = Text(rt, "Value", value, UITheme.ButtonLabel, UITheme.White,
+            TextAlignmentOptions.Right, 0f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(figure, 336f, 2f, 189f, 48f);
+
+        if (divider)
+        {
+            Image line = Img(rt, "Divider", new Color(1f, 1f, 1f, 0.07f));
+            TopLeft((RectTransform)line.transform, 0f, 52f, 525f, 1f);
+        }
+
+        return figure;
+    }
+
+    /// <summary>One training course and its best time across both rulesets.</summary>
+    private static TMP_Text TrainingRow(RectTransform parent, int index, float y, bool divider,
+        out TMP_Text time)
+    {
+        RectTransform rt = Block(parent, $"TrainingRow_{index + 1:00}", new Vector2(0f, 1f),
+            new Vector2(24f, -y), new Vector2(525f, 70f));
+
+        Image bar = Img(rt, "Accent", UITheme.Orange);
+        Anchor((RectTransform)bar.transform, new Vector2(0f, 0.5f), Vector2.zero,
+            new Vector2(3f, 40f));
+
+        TMP_Text name = Text(rt, "Name", string.Empty, UITheme.ButtonLabel, UITheme.White,
+            TextAlignmentOptions.Left, 1f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(name, 18f, 10f, 300f, 48f);
+        AutoSize(name, UITheme.MinimumSize, UITheme.ButtonLabel);
+
+        time = Text(rt, "Time", PlayerStatsFormat.NoTime, UITheme.ButtonLabel, UITheme.Dim,
+            TextAlignmentOptions.Right, 0f, FontStyles.Bold, UIFontRole.Display);
+        TopLeft(time, 336f, 10f, 189f, 48f);
+
+        if (divider)
+        {
+            Image line = Img(rt, "Divider", new Color(1f, 1f, 1f, 0.07f));
+            TopLeft((RectTransform)line.transform, 0f, 70f, 525f, 1f);
+        }
+
+        return name;
+    }
+
     // ------------------------------------------------------------------ loading overlay
 
     private static SceneLoader BuildLoadingOverlay()
@@ -876,8 +1367,10 @@ public static class MainMenuBuilder
         // brand mark
         Image tick = Img(layer, "BrandTick", UITheme.Cyan);
         TopLeft((RectTransform)tick.transform, 64f, 58f, 6f, 32f);
-        TopLeft(Text(layer, "Brand", "VERTEX", UITheme.Eyebrow, UITheme.White, TextAlignmentOptions.TopLeft, 8f, FontStyles.Bold, UIFontRole.Display),
-            84f, 54f, 400f, 44f);
+        // The reference mockups brand this corner VERTEX. The game is Skybound Trials, and the
+        // loading screen is the one place the wordmark appears outside the main menu.
+        TopLeft(Text(layer, "Brand", "SKYBOUND TRIALS", UITheme.Eyebrow, UITheme.White, TextAlignmentOptions.TopLeft, 8f, FontStyles.Bold, UIFontRole.Display),
+            84f, 54f, 520f, 44f);
 
         TopLeft(Text(layer, "Eyebrow", "LOADING STAGE", UITheme.Eyebrow, UITheme.Cyan, TextAlignmentOptions.TopLeft, UITheme.EyebrowSpacing, fontRole: UIFontRole.Mono),
             64f, 182f, 1100f, 40f);

@@ -17,6 +17,17 @@ public sealed class PlayerFreezeController : MonoBehaviour
     public CharacterController Controller => characterController;
     public bool MovementEnabled => movement != null && movement.enabled;
 
+    /// <summary>
+    /// Raised immediately after the player has been placed somewhere they did not run to.
+    ///
+    /// Every respawn and every restart in the game ends up in <see cref="Teleport"/>, so this is
+    /// the one signal that covers them all. It exists for the career statistics: a teleport is a
+    /// frame of displacement that no threshold can reliably tell apart from real travel - a
+    /// respawn at an anchor two metres from where the player died looks exactly like two metres of
+    /// running - so the code that moved them has to say so rather than be guessed at.
+    /// </summary>
+    public event System.Action Teleported;
+
     private void Awake()
     {
         if (movement == null)
@@ -84,6 +95,7 @@ public sealed class PlayerFreezeController : MonoBehaviour
         }
 
         ResetMotion();
+        Teleported?.Invoke();
     }
 
     /// <summary>Drops accumulated vertical speed so a respawn does not inherit a fall.</summary>

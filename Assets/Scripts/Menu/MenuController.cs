@@ -42,6 +42,10 @@ public sealed class MenuController : MonoBehaviour
     [SerializeField] private Button backButton;
     [SerializeField] private TMP_Text clearedValue;
 
+    [Header("Player stats")]
+    [SerializeField] private PlayerStatsView stats;
+    [SerializeField] private Button statsBackButton;
+
     /// <summary>
     /// Set by <see cref="MenuNavigation"/> when gameplay returns straight to level browsing, so the
     /// menu opens on the right screen without needing a second scene. Which screen that is comes
@@ -87,8 +91,10 @@ public sealed class MenuController : MonoBehaviour
     {
         Bind(playButton, ShowMainRun);
         Bind(trainingButton, ShowTraining);
+        Bind(statsButton, ShowStats);
         Bind(backButton, ShowMain);
         Bind(mainRunBackButton, ShowMain);
+        Bind(statsBackButton, ShowMain);
         Bind(quitButton, Quit);
 
         if (modeSelection != null)
@@ -98,12 +104,6 @@ public sealed class MenuController : MonoBehaviour
             modeSelection.Cancelled -= CancelModeSelection;
             modeSelection.Cancelled += CancelModeSelection;
             modeSelection.Hide();
-        }
-
-        // Player Stats is Phase 5. Shown, but visibly inert rather than wired to nothing.
-        if (statsButton != null)
-        {
-            statsButton.interactable = false;
         }
 
         if (featured != null)
@@ -189,6 +189,12 @@ public sealed class MenuController : MonoBehaviour
         {
             RefreshMainRun();
         }
+        else if (screen == MenuVisualController.Screen.Stats)
+        {
+            // Read once, when the screen opens. Nothing about a career can change while the
+            // player is looking at it, so there is nothing for an Update to do.
+            stats?.Refresh();
+        }
     }
 
     /// <summary>
@@ -263,6 +269,8 @@ public sealed class MenuController : MonoBehaviour
     private void ShowMainRun() => Go(MenuVisualController.Screen.MainRun);
 
     private void ShowTraining() => Go(MenuVisualController.Screen.Training);
+
+    private void ShowStats() => Go(MenuVisualController.Screen.Stats);
 
     private void ShowMain() => Go(MenuVisualController.Screen.Main);
 

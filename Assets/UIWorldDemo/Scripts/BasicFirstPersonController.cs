@@ -100,6 +100,35 @@ public sealed class BasicFirstPersonController : MonoBehaviour
     /// <summary>Horizontal speed the state machine is currently producing.</summary>
     public float CurrentHorizontalSpeed { get; private set; }
 
+    // ------------------------------------------------------------------ reporting
+
+    /// <summary>
+    /// Raised once each time a discrete parkour action actually begins.
+    ///
+    /// One event carrying which action it was, rather than six events: the controller is the only
+    /// place that knows a jump has happened as opposed to been asked for, and a single seam is a
+    /// single place to be wrong. Every raise site below sits inside the branch that has already
+    /// committed to the action - the frame the vertical velocity is set, the frame the slide
+    /// capsule shrinks, the frame the traversal starts, the frame the wall is attached - so
+    /// holding a key, or a frame in which nothing was granted, reports nothing.
+    ///
+    /// <see cref="PlayerStatsRecorder"/> is the only listener, and it is the one that decides
+    /// whether the run is in a state worth counting.
+    /// </summary>
+    public event System.Action<ParkourAction> ActionPerformed;
+
+    /// <summary>
+    /// Raised when this component moves the player without them walking there: the fall-plane
+    /// reset below. Respawns and restarts go through
+    /// <see cref="PlayerFreezeController.Teleport"/>, which raises its own.
+    ///
+    /// Distance and speed tracking need this. A teleport produces a frame of displacement that is
+    /// indistinguishable from very fast travel, and only the code that performed it can say so.
+    /// </summary>
+    public event System.Action Teleported;
+
+    private void Report(ParkourAction action) => ActionPerformed?.Invoke(action);
+
     // ------------------------------------------------------------------ integration
 
     /// <summary>
@@ -226,6 +255,7 @@ public sealed class BasicFirstPersonController : MonoBehaviour
             transform.position = spawnPosition;
             controller.enabled = true;
             verticalSpeed = 0f;
+            Teleported?.Invoke();
         }
     }
 
@@ -385,6 +415,10 @@ public sealed class BasicFirstPersonController : MonoBehaviour
             {
                 state = MoveState.WallRunning;
                 jumpConsumed = true;
+
+                // Once, here, on the frame the wall is attached - not in TickWallRun, which runs
+                // for every frame of the run and would count one wall run per frame.
+                Report(ParkourAction.WallRun);
                 return;
             }
         }
@@ -394,6 +428,7 @@ public sealed class BasicFirstPersonController : MonoBehaviour
             verticalSpeed = JumpVelocity;
             jumpBufferTimer = 0f;
             jumpConsumed = true;
+            Report(ParkourAction.Jump);
         }
 
         controller.Move(desired * dt);
@@ -411,6 +446,9 @@ public sealed class BasicFirstPersonController : MonoBehaviour
             verticalSpeed = JumpVelocity;
             jumpBufferTimer = 0f;
             jumpConsumed = true;
+
+            // A real jump: the same take-off velocity as any other, so it counts as one.
+            Report(ParkourAction.Jump);
             ApplyVertical(dt, gravity);
             return;
         }
@@ -452,6 +490,9 @@ public sealed class BasicFirstPersonController : MonoBehaviour
             launchVelocity = new Vector3(launch.x, 0f, launch.z);
             launchRemaining = launchBlendTime;
 
+            // The launch has happened. A wall jump is its own action and is never also a jump.
+            Report(ParkourAction.WallJump);
+
             CurrentHorizontalSpeed = launchVelocity.magnitude;
             controller.Move(launchVelocity * dt);
             ApplyVertical(dt, gravity);
@@ -480,6 +521,7 @@ public sealed class BasicFirstPersonController : MonoBehaviour
     {
         slide.Begin(direction, entrySpeed);
         state = MoveState.Sliding;
+        Report(ParkourAction.Slide);
 
         controller.height = slide.SlideHeight;
         controller.center = new Vector3(standingCentre.x, slide.SlideHeight * 0.5f, standingCentre.z);
@@ -544,6 +586,11 @@ public sealed class BasicFirstPersonController : MonoBehaviour
         jumpBufferTimer = 0f;
         jumpConsumed = true;
         state = MoveState.Traversing;
+
+        // The traversal has been accepted and its destination already capsule-tested, so this is
+        // the frame it starts. A contextual Space that found neither a mantle nor a vault never
+        // reaches here, and one that did is not also counted as a jump.
+        Report(kind == TraversalKind.Vault ? ParkourAction.Vault : ParkourAction.Mantle);
 
         // The CharacterController is off for the duration. Both destinations were capsule-tested
         // before we got here, and a swept Move would catch on the very obstacle being crossed.

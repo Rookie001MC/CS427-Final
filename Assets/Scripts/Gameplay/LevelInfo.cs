@@ -39,6 +39,16 @@ public sealed class LevelInfo : MonoBehaviour
 
     public string Subtitle => entry != null ? entry.Subtitle : subtitle;
 
+    /// <summary>
+    /// Which part of the game this level belongs to.
+    ///
+    /// Read straight off the catalogue asset, so a level's track is stated in exactly one place -
+    /// the same place the menu reads it from. A scene with no entry assigned is reported as
+    /// Training, which is the safe answer: the one thing that must never happen is a practice
+    /// course being counted as a completion of the main run.
+    /// </summary>
+    public LevelTrack Track => entry != null ? entry.Track : LevelTrack.Training;
+
     /// <summary>Never empty: falls back to the scene name so two levels can never share records.</summary>
     public string RecordKey
     {
